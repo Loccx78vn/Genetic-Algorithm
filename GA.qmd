@@ -1,0 +1,706 @@
+---
+title: "Genetic Algorithms in R"
+subtitle: "Việt Nam, 2024"
+categories: ["SupplyChainManagement", "Logistics","Genetic Algorithm"]
+description: "Đây là bài viết của tôi về cách sử dụng R trong ứng dụng Genetic Algorithm trong Supply Chain"
+number-sections: true
+format: 
+  html:
+    code-fold: true
+    code-tools: true
+bibliography: references.bib
+---
+
+# Giới thiệu:
+
+```{r}
+#| warning: false
+#| message: false
+#| echo: false
+#Call packages
+pacman::p_load(rio,
+               here,
+               janitor,
+               tidyverse,
+               dplyr,
+               magrittr,
+               ggplot2,
+               purrr,
+               lubridate,
+               mice,
+               plotly)
+```
+
+## Vài điểm về thuật toán Genetic:
+
+**GA** hay **Genetic Algorithm** là 1 thuật toán tối ưu hóa ngẫu nhiên (**stochastic search algorithms**), được phát triển dựa trên lý thuyết tiến hóa và sự chọn lọc tự nhiên của sinh học [@lucascrucca2013].
+
+Ở thời cấp 3, bạn đã từng học về lý thuyết tiến hóa và chọn lọc tự nhiên của [Charles Darwin](https://vi.wikipedia.org/wiki/Charles_Darwin) và [Alfred Russel](https://vi.wikipedia.org/wiki/Alfred_Russel_Wallace) ở môn Sinh học. Nếu bạn cũng từng liệt Sinh như tôi thì bạn quên cũng không sao 😅😅. Vậy thì để tôi giải thích lại như sau:
+
+Sự tiến hóa là sự thay đổi đặc điểm di truyền của 1 quần thể sinh vật, ví dụ điển hình chính là từ loại vượn đã tiến hóa thành hình dạng con người văn minh như các bạn bây giờ. Vậy quá trình tiến hóa đó diễn ra khi có sự chọn lọc tự nhiên tạo ra các biến dị di truyền (Ví dụ: đột biến,...) và kết quả là các cá thể đột biến trở nên phổ biến hơn hoặc hiếm gặp hơn trong quần thể. Vậy điều kiện để xảy ra sự chọn lọc tự nhiên có thể là sự thay đổi về môi trường sống, địa lý,... dẫn tới sự khác nhau về khả năng sống sót và sinh sản.
+
+Kết cục là xuất hiện các cá thể đột biến "mạnh mẽ hơn" hoặc đúng là "đặc biệt hơn" có khả năng tồn tại khi xuất hiện sự thay đổi lớn, ví dụ như dưới đây, do sự thay đổi về địa điểm sống, từ một loại chim sẻ đã phát triển thành 3 phân họ khác nhau.
+
+[![Hình 1: Ví dụ về chọn lọc tự nhiên](Natural_selection.jpg){fig-align="center"}](https://www.biologyonline.com/dictionary/natural-selection)
+
+Vậy lí thuyết này liên quan gì tới vấn đề tối ưu hóa. Thông thường khi bạn muốn tối ưu hóa một vấn đề gì đó, bạn cần xây dựng mô hình định lượng nó, ví dụ như dưới ảnh này ta đang có mô hình [MILP](https://www.mathworks.com/help/optim/ug/mixed-integer-linear-programming-algorithms.html) nhằm hoạch định tuyến đường và tối ưu hóa quãng đường di chuyển.
+
+[![Hình 2: Mô hình VRP](MILP.png){fig-align="center"}](https://medium.com/@rihot_gusron/capacitated-vehicle-routing-problem-with-lingo-427c2d3bf724)
+
+Mục tiêu của hàm chính là tìm ra giá trị nhỏ nhất nghĩa là chi phí cho việc di chuyển của xe là nhỏ nhất. Do đó, bạn có thể hình dung rằng **giá trị nhỏ nhất** đó như là các **cá thể đột biến** có khả năng sống sót cao nhất trong quẩn thể.
+
+Vì vậy thuật toán **Genetic** (GA) chính là lặp đi lặp lại sự chọn lọc tự nhiên trong một quần thể hoặc một mẫu để đến cuối cùng tìm ra cá thể vượt trội nhất.
+
+## Cách hoạt động GA trong ML:
+
+Trong Machine Learning, GA nhằm tìm ra đúng các biến cần thiết để xây dựng mô hình tốt nhất. Gỉa sử chúng ta có 2 mô hình là:
+
+-   Mô hình 1: gồm các biến A,C,D.
+-   Mô hình 2: gồm biến A,B,E.
+
+Vậy mô hình nào mới là tốt nhất cho mô hình dự đoán ? Chúng ta chưa biết được và chỉ có thể so sánh nó thông qua thuật toán Genetic.
+
+Về quy trình, thuật toán Genetic sẽ có cách hoạt động như dưới đây. Quy trình này mình tham khảo của [@rohithgandhi2018].
+
+[![Hình 3: Thuật toán Genetic](Genetic_Algorithm.png){fig-align="center"}](https://medium.datadriveninvestor.com/genetic-algorithms-9f920939f7cc)
+
+Diễn giải cách hoạt động:
+
+-   Bước 1 (**Initialisation**): mỗi biến được xem là *Gene* và nhiều *Gene* gộp lại thành một mô hình hay gọi là *Chromosome* và nhiều *Chromosome* sẽ tạo thành một quần thể (*Population*). Việc này giống như là bạn đang trình bày hết các phương án có thể sử dụng.
+
+[![Hình 4: Các thuật ngữ trong GA](Term.png){fig-align="center"}](https://www.doc.ic.ac.uk/research/technicalreports/2003/DTR03-4.pdf)
+
+-   Bước 2 (**Fitness Function**): Bạn cần xây dựng một hàm mục tiêu để tính toán giá trị cho các mô hình ở bước 1.
+
+-   Bước 3 (**Selection**): Biến nào có giá trị yếu kém sẽ bị loại và quá trình tính toán sẽ tiếp tục ở thế hệ của nó tiếp theo. Diễn giải đơn giản hơn là chúng ta thử một cách khác và cố gắng cải thiện kết quả.
+
+-   Bước 4 (**Crossover**): Tạo ra mô hình gồm các biến tốt đã lựa chọn ở bước 3. Ví dụ như biến A, B là tốt cho mô hình.
+
+-   Bước 5 (**Mutation**): Thay đổi mô hình đầu vào đã bao gồm các biến ở bước 4 và bắt đầu lại từ bước 1. Ví dụ mô hình cần chọn gồm 5 biến và ta đã chọn được biến A,B là tốt. Do đó, khi quay lại bước 1, ta chỉ cần chọn thêm 3 biến thay vì 5 biến như thông thường.
+
+# Thực hành trong R:
+
+Sau khi đã sơ lược về thuật toán, bây giờ ta sẽ vào phần thực hành trong R. Vậy làm sao để ứng dụng thuật toán Genetic trong R, mình đã kham khảo qua nhiều nguồn tài liệu và tổng hợp dưới đây:
+
+**Xây dựng hàm mục tiêu**: hàm mục tiêu là bước quan trọng nhất trong thuật toán Genetic vì nó là cơ sở để đánh giá và lựa chọn cá thể vượt trội nhất. Và hàm mục tiêu sẽ luôn khác nhau tùy vào vấn đề mà ta đặt ra. Gỉa sử chúng ta muốn tối ưu chi phí thì nó là hàm Min, còn ta muốn tối đa lợi nhuận thì nó sẽ là hàm Max.
+
+Vậy hàm mục tiêu của bài toán trên trong R, bạn có thể tham khảo phần code bên dưới mình:
+
+::: callout-important
+### Type of fitness function
+
+Đối số `type` trong hàm có 3 giá trị:
+
+-   `"binary"`: đại diện cho biến quyết định dạng phân loại, ví dụ: có/không
+-   `"real-valued"`: dùng dể tối ưu cho các biến quyết định là dạng số thực, số tự nhiên.
+-   `"permutation"`: cho các vấn đề liên quan đến việc sắp xếp lại các biến thành danh sách, ví dụ: thang đo Likert.
+:::
+
+Chi tiết về hàm `ga()`, bạn có thể tham khảo tài liệu của [@lucascrucca2013].
+
+## Thuật toán Genetic:
+
+Vậy bây giờ chúng ta sẽ xử lí bài toán trên theo thuật toán **Genetic**
+
+Gỉa sử chúng ta có bài toán về vận chuyển hàng từ nhà kho để thỏa mãn nhu cầu ở các điểm **DC (Distribution center)**. Và công thức để tính toán được chi phí là:
+
+Hàm chi phí tổng thể được xác định như sau:
+
+$$
+TC = \sum_{i=1}^{m} \left( D_{ij} \times \frac{P}{F} \times 0.4 + LC_i \right) \times Q_j
+$$
+Vì vậy, nếu trong công việc, chúng ta sẽ cần lấy dữ liệu từ **Data warehouse** bằng SQL hoặc các phần mềm **Business Intelligence** khác. Ở đây, nhằm minh họa, mình đã tạo ra code ở phía dưới để các bạn luyện tập.
+
+```{r}
+# Create a data frame for loading costs
+loading_costs <- data.frame(
+  Warehouse = rep(paste("Warehouse", 1:5), each = 4),
+  ID = rep(1:5, times = 4),
+  Weight_Category = rep(c("< 2 tons", "2 to 5 tons", "5 to 10 tons", "> 10 tons"), times = 5),
+  Has_Machine = rep(c("Yes", "No", "Yes", "No", "No"), each = 4),
+  Loading_Cost = c(80, 100, 120, 160,  # Warehouse 1 (with machine)
+                   110, 150, 180, 210,  # Warehouse 2 (without machine)
+                   85, 105, 125, 140,  # Warehouse 3 (with machine)
+                   150, 170, 190, 210,  # Warehouse 4 (without machine)
+                   140, 165, 185, 215)   # Warehouse 5 (without machine)
+)
+
+# Define warehouses with coordinates (latitude, longitude)
+warehouses <- data.frame(
+  ID = 1:5,
+  Latitude = c(21.0285, 16.0545, 10.7769, 14.0583, 19.8060), # Example latitudes (Hanoi, HCMC, Da Nang, etc.)
+  Longitude = c(105.804, 108.2022, 106.6957, 108.2772, 105.7460) # Example longitudes
+)
+
+# Define distribution centers data in Vietnam (example coordinates)
+distribution_centers <- data.frame(
+  ID = 1:3,
+  Demand = c(90, 30, 150),
+  Latitude = c(17.974855, 10.7769, 15.122327), # Example latitudes (Hanoi, Da Nang, HCMC)
+  Longitude = c(102.630867, 106.6957, 108.799357) # Example longitudes
+)
+```
+
+Nếu bạn gặp khó khăn trong việc phải đối mặt với cả đống dữ liệu từ hệ thống và chưa biết lấy dữ liệu nào để phân tích hoặc gộp bảng nào qua bảng nào thì lời khuyên của tôi là hãy vẽ bảng **Entity relation diagram (ERD)**.
+
+**ERD** là một công cụ trực quan dùng để mô tả cấu trúc dữ liệu trong cơ sở dữ liệu. ERD thể hiện các thực thể (*entities*), thuộc tính (*attributes*), và các mối quan hệ (*relationships*) giữa chúng. Các thực thể thường được biểu diễn dưới dạng hình chữ nhật, thuộc tính dưới dạng hình ellips, và mối quan hệ bằng hình thoi hoặc đường nối. ERD giúp lập kế hoạch cho thiết kế cơ sở dữ liệu, đảm bảo rằng các yếu tố dữ liệu và quan hệ giữa chúng được xác định rõ ràng, tạo nền tảng cho việc phát triển và quản lý dữ liệu hiệu quả.
+
+Các bạn có thể thấy mối quan hệ thông qua bảng **Entity relation diagram (ERD)** dưới đây:
+
+```{r}
+#| echo: false
+library(datamodelr)
+# Create the data model from your data frames
+dm1 <- dm_from_data_frames(list(
+  Warehouses = warehouses,
+  Loading_Costs = loading_costs,
+  Distribution_Centers = distribution_centers
+)) %>%
+  dm_set_key("Warehouses", "ID") %>%
+  dm_set_key("Loading_Costs", c("Warehouse", "ID")) %>%
+  dm_set_key("Distribution_Centers", "ID") %>%
+  dm_add_references(
+    Loading_Costs$Warehouse == Warehouses$ID,  # Correct reference
+    Loading_Costs$ID == Distribution_Centers$ID  # Assuming this is the correct reference
+  )
+
+# Create and render the ERD
+dm_create_graph(dm1, rankdir = "LR", columnArrows = TRUE) %>%
+  dm_render_graph()
+```
+
+::: callout-tip
+### Tải package datamodelr:
+
+Mình tạo biểu đồ này bằng thư viện datamodelr. Bạn có thể tải bằng cú pháp: `devtools::install_github("bergant/datamodelr")`
+:::
+
+Như vậy, dựa vào đó, ta sẽ tính toán được 2 bảng quan trọng:
+
+-   Bảng giá loading ở các kho. (Hình bên trái)
+
+-   Bảng chi phí vận chuyển từ từng WH đến các DCs. (Hình bên phải)
+
+```{r}
+## Calculate the transportation cost:
+# Haversine distance function
+haversine <- function(lat1, lon1, lat2, lon2) {
+  R <- 6371 # Radius of Earth in kilometers
+  dlat <- (lat2 - lat1) * pi / 180
+  dlon <- (lon2 - lon1) * pi / 180
+  a <- sin(dlat / 2) * sin(dlat / 2) +
+       cos(lat1 * pi / 180) * cos(lat2 * pi / 180) * 
+       sin(dlon / 2) * sin(dlon / 2)
+  c <- 2 * atan2(sqrt(a), sqrt(1 - a))
+  R * c # Distance in kilometers
+}
+
+# Calculate distance matrix based on coordinates
+distance_matrix <- matrix(0, nrow = nrow(warehouses), ncol = nrow(distribution_centers))
+
+for (i in 1:nrow(warehouses)) {
+  for (j in 1:nrow(distribution_centers)) {
+    distance_matrix[i, j] <- haversine(
+      warehouses$Latitude[i], warehouses$Longitude[i],
+      distribution_centers$Latitude[j], distribution_centers$Longitude[j]
+    )
+  }
+}
+
+# Define the fuel price (example value)
+fuel_price <- 20 # Fuel price per kilometer
+
+# Calculate transportation costs
+transportation_costs <- distance_matrix * fuel_price * 0.4
+
+## Calculate the loading cost:
+weights_per_good <- 0.1
+
+# Calculate total weight for each distribution center
+total_weight <- distribution_centers$Demand * weights_per_good
+
+# Function to get loading cost based on total weight
+get_loading_cost <- function(total_weight) {
+  if (total_weight < 2) {
+    loading_costs %>% filter(Weight_Category == "< 2 tons") %>% pull(Loading_Cost)
+  } else if (total_weight >= 2 & total_weight < 5) {
+    loading_costs %>% filter(Weight_Category == "2 to 5 tons") %>% pull(Loading_Cost)
+  } else if (total_weight >= 5 & total_weight < 10) {
+    loading_costs %>% filter(Weight_Category == "5 to 10 tons") %>% pull(Loading_Cost)
+  } else {
+    loading_costs %>% filter(Weight_Category == "> 10 tons") %>% pull(Loading_Cost)
+  }
+}
+
+# Calculate loading costs based on total weights for each distribution center
+loading_costs_per_dc <- sapply(total_weight, 
+                               get_loading_cost)
+```
+
+```{r}
+#| warning: false
+#| message: false
+#| echo: false
+#| layout: [[50,50]]
+#| fig-caption: "Each cell's color intensity corresponds to the magnitude of the data point it represents, making it easy to identify patterns, trends, and correlations at a glance."
+library(ggplot2)
+library(reshape2)
+
+# Convert the distance matrix to a data frame
+distance_df <- melt(distance_matrix)
+colnames(distance_df) <- c("Warehouse", "Distribution_Center", "Distance (km)")
+
+# Plot the distance matrix with updated colors
+ggplot(distance_df, aes(x = Warehouse, y = Distribution_Center, fill = `Distance (km)`)) +
+  geom_tile() +
+  geom_text(aes(label = round(`Distance (km)`, 1)), color = "black") +  # Add numbers
+  scale_fill_gradient(high = "#ff7f0e", low = "white") +  # Custom colors
+  theme_minimal() +
+  labs(title = "Transportation Costs Heatmap",
+       x = "Warehouse",
+       y = "Distribution Center") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Convert the transportation costs matrix to a data frame
+costs_df <- melt(loading_costs_per_dc )
+colnames(costs_df) <- c("Warehouse", "Distribution_Center", "Transportation Cost")
+
+# Plot the transportation costs matrix with updated colors
+ggplot(costs_df, aes(x = Warehouse, y = Distribution_Center, fill = `Transportation Cost`)) +
+  geom_tile() +
+  geom_text(aes(label = round(`Transportation Cost`, 1)), color = "black") +  # Add numbers
+  scale_fill_gradient(high = "#1f77b4", low = "white") +  # Custom colors
+  theme_minimal() +
+  labs(title = "Loading Costs Heatmap",
+       x = "Warehouse",
+       y = "") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+Sau khi đã có đủ dữ liệu, bạn sẽ bắt đầu viết hàm mục tiêu và dùng thuật toán GA để tìm ra giá trị tối ưu nhất.
+
+Trong hàm `ga` từ gói **GA** trong R, có một số đối số quan trọng cho phép bạn tùy chỉnh thuật toán di truyền. Dưới đây là một cái nhìn tổng quan về một số đối số quan trọng:
+
+-   **type**: Chỉ định loại tối ưu hóa (ví dụ: `"real-valued"`, `"binary"` hoặc `"permutation"`).
+
+-   **fitness**: Hàm đánh giá độ phù hợp; nó nên nhận một vector tham số làm đầu vào và trả về một giá trị số.
+
+-   **lower** và **upper**: Định nghĩa giới hạn cho các biến nếu bạn đang tối ưu hóa trong không gian liên tục (dùng cho các loại giá trị thực).
+
+-   **popSize**: Thiết lập kích thước quần thể cho mỗi thế hệ.
+
+-   **maxiter**: Chỉ định số thế hệ tối đa để chạy thuật toán.
+
+-   **run**: Chỉ định số thế hệ để chạy thuật toán mà không có sự cải thiện trước khi dừng lại.
+
+-   **pmutation**: Xác suất xảy ra đột biến trong quần thể.
+
+-   **elitism**: Xác định xem các cá thể tốt nhất có nên được giữ lại trong thế hệ tiếp theo hay không.
+
+Những đối số này giúp điều chỉnh thuật toán di truyền cho các nhu cầu tối ưu hóa cụ thể của bạn, cho phép hiệu suất tốt hơn và hội tụ về các giải pháp tối ưu.
+
+Ngoài ra, còn có các lưu ý cho bạn khi sử dụng R như sau:
+
+::: callout-caution
+### Lưu ý khi dùng hàm ga():
+
+Hàm `ga()` phải có ít nhất 2 đối số là `type` và `fitness thì R mới chạy được.`
+
+-   Riêng khi type = "binary" thì cần thêm đối số `nBits.`
+
+-   Còn khi `type = "real-valued"/"permutation"` thì cần thêm đối số `min` và `max`.
+:::
+
+```{r}
+#| message: false
+#| warning: false
+#| output: false
+# Load necessary library
+library(GA)
+demand<-c(distribution_centers$Demand)
+
+cost_matrix = transportation_costs + loading_costs_per_dc
+# Define the transportation cost matrix
+
+# Define the objective function
+objective_function <- function(quantities) {
+    quantities_matrix <- matrix(quantities, 
+                                nrow = 5, 
+                                ncol = 3, 
+                                byrow = TRUE)
+    
+    total_cost <- sum(quantities_matrix * cost_matrix)
+    
+    # Check if demands are met
+    if (any(colSums(quantities_matrix) < demand)) {
+        return(Inf)  # Penalize if demands are not met
+    }
+    
+    return(total_cost)
+}
+
+# Set up the Genetic Algorithm
+num_vars <- 5 * 3  # 5 warehouses, 3 distribution centers
+ga_result <- ga(
+    type = "real-valued",
+    fitness = function(x) -objective_function(x),  # Negate for maximization
+    lower = rep(0, num_vars),  # Minimum quantity
+    upper = rep(100, num_vars),  # Maximum quantity (adjust as needed)
+    popSize = 50,
+    maxiter = 100,
+    run = 10,
+    monitor = TRUE
+)
+```
+
+Và cuối cùng, sau khi có kết quả, mình sẽ dùng các thư viện gồm: **Leaflet**, **gt**, và **biểu đồ Sankey** phục vụ những mục đích khác nhau cho trực quan hóa dữ liệu.
+
+1.  **Leaflet**: Đây là một thư viện mạnh mẽ để tạo bản đồ tương tác. Nó cho phép người dùng dễ dàng thêm các lớp, điểm đánh dấu và pop-up, rất lý tưởng để trực quan hóa dữ liệu địa lý. Leaflet đặc biệt hữu ích để hiển thị các dữ liệu như vị trí, lộ trình, hoặc phân bố không gian.
+
+2.  **gt**: Gói **gt** được thiết kế để tạo ra các bảng chất lượng cao trong R. Nó cho phép người dùng định dạng và tạo kiểu cho bảng một cách dễ dàng, giúp chúng trở nên hấp dẫn và dễ đọc. gt hỗ trợ các tính năng như định dạng tùy chỉnh, dòng tóm tắt, và thậm chí thêm chú thích, nâng cao cách trình bày dữ liệu trong báo cáo.
+
+3.  **Biểu đồ Sankey**: Những biểu đồ này được sử dụng để trực quan hóa luồng và mối quan hệ giữa các danh mục khác nhau. Trong R, gói **networkD3** hoặc **ggalluvial** có thể tạo ra biểu đồ Sankey, giúp hiểu cách các giá trị di chuyển giữa các nút, chẳng hạn như theo dõi hành trình người dùng hoặc hiển thị phân bổ tài nguyên.
+
+Nhìn chung, những công cụ này cung cấp các lựa chọn mạnh mẽ để trình bày dữ liệu một cách hấp dẫn và thông tin. Bạn có thể lựa chọn 1 trong 3 chúng, vì lý do học nên mình trình bày cả 3 luôn!.
+
+```{r}
+#| warning: false
+#| message: false
+#| layout: [[100],[40,60]]
+
+library(leaflet)
+
+# Create custom icons
+warehouse_icon <- makeIcon(
+      iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/warehouse_icon.png",  # Update with your actual file path
+      iconWidth = 30, 
+      iconHeight = 30
+    )
+
+dc_icon <- makeIcon(
+      iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/distribution_center.png",  # Update with your actual file path
+      iconWidth = 30, 
+      iconHeight = 30
+    )
+    
+    # Assuming ga_result@solution contains optimal quantities
+ga_result_solution <- c(ga_result@solution)
+
+# Reshape the solution into a matrix (5 warehouses x 3 DCs)
+optimal_quantities <- matrix(ga_result@solution,
+                             nrow = 5, 
+                             ncol = 3, 
+                             byrow = TRUE)
+
+    # Create the leaflet map
+map <- leaflet() %>% 
+      addTiles() %>%
+      addMarkers(data = warehouses, 
+                 lat = ~Latitude, lng = ~Longitude, 
+                 popup = ~paste("Warehouse ID:", ID), 
+                 icon = warehouse_icon) %>%
+      addMarkers(data = distribution_centers, 
+                 lat = ~Latitude, lng = ~Longitude, 
+                 popup = ~paste("DC ID:", ID, "<br>Demand:", Demand), 
+                 icon = dc_icon)
+
+    # Add routes based on the optimal quantities
+    for (i in 1:nrow(optimal_quantities)) {
+      for (j in 1:ncol(optimal_quantities)) {
+        if (optimal_quantities[i, j] > 0) {
+          route_start <- warehouses[warehouses$ID == i, c("Longitude", "Latitude")]
+          route_end <- distribution_centers[distribution_centers$ID == j, c("Longitude", "Latitude")]
+          
+map <- map %>%
+            addPolylines(lat = c(route_start$Latitude, route_end$Latitude),
+                         lng = c(route_start$Longitude, route_end$Longitude),
+                         color = "black", weight = 2, opacity = 0.5)
+        }
+      }
+    }
+
+map %>%
+  addProviderTiles(providers$CartoDB.Positron) 
+
+library(gt)
+library(gtExtras)
+
+    # Convert GA solution to a data frame
+result <- as.data.frame(matrix(ga_result@solution, nrow = 5, byrow = TRUE))
+    colnames(result) <- c("DC1", "DC2", "DC3")
+    rownames(result) <- c("WH1", "WH2", "WH3", "WH4", "WH5")
+result <- cbind(Workload = rownames(result), result)
+
+result_long <- result %>% 
+  pivot_longer(cols = starts_with("DC"), names_to = "Distribution_Center", values_to = "Quantity")
+    # Create and display the table
+result_long %>%
+  gt() %>%
+  tab_header(title = "Details Planning Table") %>%
+  cols_label(Distribution_Center = "Distribution Center") %>% 
+  tab_row_group(
+    label = html("<strong><img src='https://upload.wikimedia.org/wikipedia/commons/5/56/Flag_of_Laos.svg' width='20' /> Laos</strong>"),
+    rows = Distribution_Center == "DC1"
+  ) %>% 
+  tab_row_group(
+    label = html("<strong><img src='https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Flag_of_Vietnam.svg/345px-Flag_of_Vietnam.svg.png' width='20' /> Vietnam</strong>"),
+    rows = Distribution_Center %in% c("DC2", "DC3")
+  ) %>% 
+  fmt_number(columns = c(Quantity), decimals = 2) %>%
+  cols_label(Workload = "Warehouse") %>%
+  tab_style(style = list(cell_text(align = "center")),
+            locations = cells_body(columns = everything())) %>%
+  tab_source_note(source = md("*Source: package gt in R*")) %>%
+  gt_theme_excel() %>%
+  summary_rows(
+    groups = everything(),
+    columns = Quantity, 
+    fns = list(Total = ~sum(.),
+               Count = ~n()))%>% 
+  tab_footnote(
+    footnote = md("**Count** means number of shipment."),
+    locations = cells_summary(rows = "Count")
+  ) %>% 
+  tab_footnote(
+    footnote = md("**Total** means the optimal quantity of good."),
+    locations = cells_summary(rows = "Total")
+  ) 
+
+library(networkD3)
+library(jsonlite)
+
+# Define colors for nodes
+colors <- c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+
+# Define example data
+Warehouses <- c("Warehouse 1", "Warehouse 2", "Warehouse 3", "Warehouse 4", "Warehouse 5")
+Distribution_centers <- c("DC 1", "DC 2", "DC 3")
+
+# Create nodes data frame
+nodes <- data.frame(name = c(Warehouses, Distribution_centers))
+
+# Assign colors based on node index
+node_colors <- c(rep(1:length(Warehouses), each = 1), rep(length(Warehouses) + 1:length(Distribution_centers), each = 1))
+
+# Create links data frame
+links <- data.frame(
+  source = rep(0:(nrow(optimal_quantities) - 1), each = ncol(optimal_quantities)),  
+  target = as.vector(sapply(0:(ncol(optimal_quantities) - 1), 
+                             function(j) rep(nrow(optimal_quantities) + j, nrow(optimal_quantities)))),  
+  value = as.vector(optimal_quantities)  
+)
+
+# Create a Sankey diagram with node colors
+sankey <- sankeyNetwork(Links = links, 
+                        Nodes = nodes, 
+                        Source = "source", 
+                        Target = "target", 
+                        Value = "value",
+                        NodeID = "name",
+                        colourScale = JS(paste0("d3.scaleOrdinal().domain([0,", length(colors) - 1, "]).range(", toJSON(colors), ");")),
+                        height = 900,  # Adjust height to reduce vertical space
+                        width = 1000)   # Adjust width to fit more nodes in one line
+
+
+## Add title and caption:
+sankey <- htmlwidgets::prependContent(sankey, htmltools::tags$h1("Sankey chart"))
+sankey <- htmlwidgets::appendContent(sankey, htmltools::tags$p(style = "font-size: 14px; text-align: center;", " A wider arrow indicates that a larger quantity is being sent from that warehouse to a distribution center."))
+
+# Display the Sankey diagram
+sankey
+```
+
+## Mô hình MILP:
+
+### Giới thiệu sơ lược:
+
+**MILP (Mixed Integer Linear Programming)** là một phương pháp tối ưu hóa được sử dụng trong các bài toán lập kế hoạch, phân bổ tài nguyên, và quyết định trong các lĩnh vực như logistics, sản xuất, tài chính, và nhiều lĩnh vực khác. MILP là một phần mở rộng của lập trình tuyến tính (Linear Programming - LP), trong đó có các biến là số nguyên (integer variables) bên cạnh các biến liên tục (continuous variables).
+
+Trong đó, cấu trúc của một bài toán MILP bao gồm:
+
+1.  **Hàm mục tiêu**: Là một hàm tuyến tính mà bạn muốn tối ưu hóa (tối đa hóa hoặc tối thiểu hóa).
+
+    $$
+    \text{Maximize or Minimize } Z = c_1x_1 + c_2x_2 + \ldots + c_nx_n
+    $$
+
+2.  **Ràng buộc**: Bao gồm các điều kiện tuyến tính mà các biến phải thỏa mãn.
+
+    $$
+    a_{11}x_1 + a_{12}x_2 + \ldots + a_{1n}x_n \leq b_1
+    $$
+
+    $$
+    a_{21}x_1 + a_{22}x_2 + \ldots + a_{2n}x_n \leq b_2
+    $$
+
+    ... và nhiều ràng buộc khác.
+
+3.  **Biến quyết định**: Các biến trong bài toán có thể là:
+
+    -   Biến liên tục: Có thể nhận mọi giá trị thực (ví dụ: số lượng sản phẩm).
+    -   Biến nguyên: Chỉ nhận giá trị nguyên (ví dụ: số lượng xe tải).
+    -   Biến nhị phân: Chỉ nhận giá trị 0 hoặc 1 (ví dụ: có hoặc không sử dụng một nhà máy).
+
+**Ứng dụng của MILP**
+
+-   **Quản lý chuỗi cung ứng**: Tối ưu hóa việc phân phối hàng hóa từ các kho đến các khách hàng.
+-   **Lập kế hoạch sản xuất**: Xác định số lượng sản phẩm cần sản xuất để tối đa hóa lợi nhuận hoặc giảm chi phí.
+-   **Tối ưu hóa lịch trình**: Lập lịch cho nhân viên, máy móc, hoặc tài nguyên để tối ưu hóa hiệu suất.
+-   **Quy hoạch đô thị**: Tối ưu hóa việc sử dụng đất và tài nguyên trong quy hoạch thành phố.
+
+Trong R có các thư viện như `lpSolve`, `ompr`, và `ROI` có thể được sử dụng để giải quyết các bài toán MILP.
+
+### Ví dụ:
+
+MILP là một công cụ mạnh mẽ cho việc tối ưu hóa trong nhiều lĩnh vực khác nhau. Với khả năng kết hợp giữa các biến liên tục và số nguyên, MILP có thể giải quyết nhiều bài toán phức tạp mà các phương pháp tối ưu hóa khác không thể thực hiện hiệu quả.
+
+Gỉa sử ta có bài toán về vấn đề **Transshipment** có yêu cầu là tìm ra phương án vận tải tối ưu nhất để vận chuyển hàng hóa từ nhà máy (**Factory**) thông qua **Crossdocking** và đến được **Distribution Center** với mục tiêu là đạt **chi phí thấp nhất**.
+
+![Hình 5: Vấn đề Transshipment](transshipment.png){fig-align="center"}
+
+Vì bài toán này thuộc dạng tuyến tính, phương pháp MILP sẽ làm tốt hơn nhiều so với thuật toán GA bên trên.
+
+```{r}
+#| warning: false
+#| message: false
+#| output: false
+library(ompr)
+library(ompr.roi)
+library(ROI.plugin.glpk)
+#Input:
+Supply <-c(200,300,100,150,220)
+Demand <-c(150,100,110,200,180)
+DC<-2
+m<-length(Supply)
+n<-length(Demand)
+
+Cost_CD<-read.table(text = 
+                    "CD1 CD2
+                     30 50
+                     23 66
+                     35 14
+                     70 12
+                     65 70",header = T)
+Cost_DC<-read.table(text = 
+                      "DC1 DC2 DC3 DC4 DC5
+                       12 25 22 40 41
+                       65 22 23 12 15",header = T)
+
+#MILP model from the 
+model5 <- MIPModel() %>%
+  # Add variable
+  add_variable(x[i, j], i = 1:m, j = 1:DC) %>%
+  add_variable(y[j, k], j = 1:DC, k = 1:n) %>%
+  # minimize the cost of transshipment:
+  set_objective(sum_expr(x[i, j]*Cost_CD[i, j],i = 1:m, j = 1:DC)+ sum_expr(y[j, k]*Cost_DC[j, k], k = 1:n, j = 1:DC),"min") %>%
+  add_constraint(sum_expr(y[j, k], j = 1:DC) >= Demand[k], k = 1:n) %>%
+  # The amount of inventory in Crossdocking is smaller than production goods
+  add_constraint(sum_expr(x[i, j], j = 1:DC) <= Supply[i], i = 1:m) %>% 
+  # The amount of is bigger than demand in DC
+  add_constraint(sum_expr(x[i, j], i = 1:m) - sum_expr(y[j, k], k = 1:n) >= 0,j = 1:DC) %>%
+  add_constraint(x[i, j] >= 0, j = 1:DC, i = 1:m)%>% 
+  add_constraint(y[j, k] >= 0, j = 1:DC, k = 1:n)%>% 
+  #Solve the model:
+  solve_model(with_ROI(solver = "glpk", verbose = TRUE))
+```
+
+```{r}
+#| layout-nrow: 2
+## Barchart:
+solution <- get_solution(model5, x[i, j]) %>% 
+     filter(value > 0)
+
+library(ggplot2)
+library(dplyr)
+
+# Assuming `solution` contains the results of x[i, j]
+# Transform the solution into a tidy format for plotting
+plot_data <- solution %>%
+  rename(Manufacter= i, DC = j, Flow = value) %>%
+  mutate(Manufacter = paste("Manufacter", Manufacter),
+         DC = paste("DC", DC))
+
+# Create a plot
+ggplot(plot_data, aes(x = Manufacter, y = Flow, fill = DC)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Transshipment Flow from Manufacters to Distribution Centers",
+       x = "Manufacters",
+       y = "Flow Amount",
+       fill = "Distribution Centers") +
+  theme(text = element_text(size = 12),
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set2")
+
+
+library(gt)
+
+# Assuming `solution` contains the results of x[i, j]
+# Transform the solution into a tidy format for the table
+table_data <- solution %>%
+  rename(Manufacturer = i, DC = j, Flow = value) %>%
+  mutate(Manufacturer = paste("Manufacturer", Manufacturer),
+         DC = paste("DC", DC)) %>% 
+  select(-variable)
+
+# Create a gt table
+table_data %>%
+  gt() %>%
+  tab_header(
+    title = md("**Transshipment Flows from Manufacturers to Distribution Centers**")
+  ) %>%
+  cols_label(
+    Manufacturer = "Manufacturer",
+    DC = "Distribution Center",
+    Flow = "Flow Amount"
+  ) %>%
+  fmt_number(
+    columns = c(Flow),
+    decimals = 2
+  ) %>%
+  tab_style(
+    style = list(
+      cell_fill(color = "lightblue")
+    ),
+    locations = cells_body(
+      columns = c(Flow),
+      rows = Flow > 0
+    )
+  ) %>%
+  tab_options(
+    table.width = pct(100)
+  ) %>% 
+  gt_theme_excel()
+```
+
+<div>
+  <hr>
+
+  <h3> Share </h3>
+  <a href="https://github.com/Loccx78vn/" target="_blank" class="github-button">Visit my GitHub</a>
+
+  <hr>
+</div>
+
+<style>
+.github-button {
+  display: inline-block;
+  padding: 10px 20px;
+  font-size: 16px;
+  color: white;
+  background-color: #007bff; /* Bootstrap primary color */
+  border: none;
+  border-radius: 5px;
+  text-decoration: none;
+  text-align: center;
+  transition: background-color 0.3s;
+}
+
+.github-button:hover {
+  background-color: #0056b3; /* Darker shade on hover */
+}
+</style>
+

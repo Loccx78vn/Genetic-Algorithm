@@ -1,0 +1,26 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Genetic Algorithm"
+  navbar:
+    left:
+      - href: GA.qmd
+    tools:
+      - icon: github
+        text: Github
+        href: https://github.com/Loccx78vn/Forecasting_time_series
+      - icon: twitter
+        text: Another projects
+        href: https://rpubs.com/loccx
+  page-footer:
+    right: "Built with [Quarto](https://quarto.org/)"
+    left: "&copy; Copyright 2024, Loc cao"
+
+format:
+  html:
+    theme: 
+      light: flatly
+      dark: darkly
+    toc: true
