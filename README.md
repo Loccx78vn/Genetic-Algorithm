@@ -12,4 +12,4 @@ Both GA and MILP are beneficial for a range of real-life applications, such as s
 
 Implementing these techniques in R is straightforward with packages like `GA` for genetic algorithms and `ompr` for MILP. This accessibility enables users to tackle complex optimization challenges efficiently, empowering them to make informed, data-driven decisions in various practical scenarios.
 
-![Genetic Algorithms and MILP model in R](path/to/your/image.png)
+![Genetic Algorithms and MILP model in R](readme_pic.png)
