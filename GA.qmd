@@ -82,7 +82,7 @@ Diễn giải cách hoạt động:
 
 Sau khi đã sơ lược về thuật toán, bây giờ ta sẽ vào phần thực hành trong R. Vậy làm sao để ứng dụng thuật toán Genetic trong R, mình đã kham khảo qua nhiều nguồn tài liệu và tổng hợp dưới đây:
 
-**Xây dựng hàm mục tiêu**: hàm mục tiêu là bước quan trọng nhất trong thuật toán Genetic vì nó là cơ sở để đánh giá và lựa chọn cá thể vượt trội nhất. Và hàm mục tiêu sẽ luôn khác nhau tùy vào vấn đề mà ta đặt ra. Gỉa sử chúng ta muốn tối ưu chi phí thì nó là hàm Min, còn ta muốn tối đa lợi nhuận thì nó sẽ là hàm Max.
+**Xây dựng hàm mục tiêu**: hàm mục tiêu là bước quan trọng nhất trong thuật toán Genetic vì nó là cơ sở để đánh giá và lựa chọn cá thể vượt trội nhất. Và hàm mục tiêu sẽ luôn khác nhau tùy vào vấn đề mà ta đặt ra. Giả sử chúng ta muốn tối ưu chi phí thì nó là hàm Min, còn ta muốn tối đa lợi nhuận thì nó sẽ là hàm Max.
 
 Vậy hàm mục tiêu của bài toán trên trong R, bạn có thể tham khảo phần code bên dưới mình:
 
@@ -114,7 +114,7 @@ Vì vậy, nếu trong công việc, chúng ta sẽ cần lấy dữ liệu từ
 ```{r}
 # Create a data frame for loading costs
 loading_costs <- data.frame(
-  Warehouse = rep(paste("Warehouse", 1:5), each = 4),
+  Warehouse = rep(paste("WH", 1:5), each = 4),
   ID = rep(1:5, times = 4),
   Weight_Category = rep(c("< 2 tons", "2 to 5 tons", "5 to 10 tons", "> 10 tons"), times = 5),
   Has_Machine = rep(c("Yes", "No", "Yes", "No", "No"), each = 4),
@@ -123,6 +123,20 @@ loading_costs <- data.frame(
                    85, 105, 125, 140,  # Warehouse 3 (with machine)
                    150, 170, 190, 210,  # Warehouse 4 (without machine)
                    140, 165, 185, 215)   # Warehouse 5 (without machine)
+)
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Define parameters
+weight_categories <- c("< 1.5", "1.5 to 2.5", "2.5 to 5", "5 to 10", "> 10")
+# Create the data frame
+loading_costs <- data.frame(
+  Warehouse = rep(1:5, each = 15),  # 5 warehouses, 15 rows each
+  DC = rep(rep(1:3, each = 5), times = 5),  # Repeat 1, 2, 3 for each warehouse
+  Weight_Category = rep(weight_categories, times = 15),  # Repeat categories for 15 rows
+  Loading_Cost = round(runif(75, 5, 150), 2),
+  Has_Machine = sample(c("Yes", "No"), 75, replace = TRUE)
 )
 
 # Define warehouses with coordinates (latitude, longitude)
@@ -136,19 +150,16 @@ warehouses <- data.frame(
 distribution_centers <- data.frame(
   ID = 1:3,
   Demand = c(90, 30, 150),
-  Latitude = c(17.974855, 10.7769, 15.122327), # Example latitudes (Hanoi, Da Nang, HCMC)
+  Latitude = c(17.974855, 11.7769, 15.122327), # Example latitudes (Hanoi, Da Nang, HCMC)
   Longitude = c(102.630867, 106.6957, 108.799357) # Example longitudes
 )
 ```
 
-Nếu bạn gặp khó khăn trong việc phải đối mặt với cả đống dữ liệu từ hệ thống và chưa biết lấy dữ liệu nào để phân tích hoặc gộp bảng nào qua bảng nào thì lời khuyên của tôi là hãy vẽ bảng **Entity relation diagram (ERD)**.
-
-**ERD** là một công cụ trực quan dùng để mô tả cấu trúc dữ liệu trong cơ sở dữ liệu. ERD thể hiện các thực thể (*entities*), thuộc tính (*attributes*), và các mối quan hệ (*relationships*) giữa chúng. Các thực thể thường được biểu diễn dưới dạng hình chữ nhật, thuộc tính dưới dạng hình ellips, và mối quan hệ bằng hình thoi hoặc đường nối. ERD giúp lập kế hoạch cho thiết kế cơ sở dữ liệu, đảm bảo rằng các yếu tố dữ liệu và quan hệ giữa chúng được xác định rõ ràng, tạo nền tảng cho việc phát triển và quản lý dữ liệu hiệu quả.
-
-Các bạn có thể thấy mối quan hệ thông qua bảng **Entity relation diagram (ERD)** dưới đây:
+Nếu bạn gặp khó khăn trong việc phải đối mặt với cả đống dữ liệu từ hệ thống và chưa biết lấy dữ liệu nào để phân tích hoặc gộp bảng nào qua bảng nào thì lời khuyên của tôi là hãy vẽ bảng **Entity relation diagram (ERD)**. Các bạn có thể dễ dàng hình dung các mối quan hệ thông qua bảng **Entity relation diagram (ERD)** dưới đây:
 
 ```{r}
 #| echo: false
+#| fig-cap: "Biểu đồ 1: EDR model"
 library(datamodelr)
 # Create the data model from your data frames
 dm1 <- dm_from_data_frames(list(
@@ -157,17 +168,19 @@ dm1 <- dm_from_data_frames(list(
   Distribution_Centers = distribution_centers
 )) %>%
   dm_set_key("Warehouses", "ID") %>%
-  dm_set_key("Loading_Costs", c("Warehouse", "ID")) %>%
+  dm_set_key("Loading_Costs", c("Warehouse", "DC")) %>%
   dm_set_key("Distribution_Centers", "ID") %>%
   dm_add_references(
     Loading_Costs$Warehouse == Warehouses$ID,  # Correct reference
-    Loading_Costs$ID == Distribution_Centers$ID  # Assuming this is the correct reference
+    Loading_Costs$DC == Distribution_Centers$ID  # Assuming this is the correct reference
   )
 
 # Create and render the ERD
 dm_create_graph(dm1, rankdir = "LR", columnArrows = TRUE) %>%
   dm_render_graph()
 ```
+
+**ERD** là một công cụ trực quan dùng để mô tả cấu trúc dữ liệu trong cơ sở dữ liệu. ERD thể hiện các thực thể (*entities*), thuộc tính (*attributes*), và các mối quan hệ (*relationships*) giữa chúng. Các thực thể thường được biểu diễn dưới dạng hình chữ nhật, thuộc tính dưới dạng hình ellips, và mối quan hệ bằng hình thoi hoặc đường nối. ERD giúp lập kế hoạch cho thiết kế cơ sở dữ liệu, đảm bảo rằng các yếu tố dữ liệu và quan hệ giữa chúng được xác định rõ ràng, tạo nền tảng cho việc phát triển và quản lý dữ liệu hiệu quả.
 
 ::: callout-tip
 ### Tải package datamodelr:
@@ -182,6 +195,9 @@ Như vậy, dựa vào đó, ta sẽ tính toán được 2 bảng quan trọng:
 -   Bảng chi phí vận chuyển từ từng WH đến các DCs. (Hình bên phải)
 
 ```{r}
+#| warning: false
+#| message: false
+#| fig-cap: "Biểu đồ 2: Heatmap cho bảng chi phí vận chuyển và bốc xếp "
 ## Calculate the transportation cost:
 # Haversine distance function
 haversine <- function(lat1, lon1, lat2, lon2) {
@@ -216,44 +232,41 @@ transportation_costs <- distance_matrix * fuel_price * 0.4
 ## Calculate the loading cost:
 weights_per_good <- 0.1
 
-# Calculate total weight for each distribution center
-total_weight <- distribution_centers$Demand * weights_per_good
+mean_loading_cost<-loading_costs %>% 
+  group_by(DC, Warehouse) %>% 
+  summarise(mean = mean(Loading_Cost,na.rm = TRUE)/1000/weights_per_good) %>% # Assumes weighted of goods is 0.1kg 
+  ungroup()
 
-# Function to get loading cost based on total weight
-get_loading_cost <- function(total_weight) {
-  if (total_weight < 2) {
-    loading_costs %>% filter(Weight_Category == "< 2 tons") %>% pull(Loading_Cost)
-  } else if (total_weight >= 2 & total_weight < 5) {
-    loading_costs %>% filter(Weight_Category == "2 to 5 tons") %>% pull(Loading_Cost)
-  } else if (total_weight >= 5 & total_weight < 10) {
-    loading_costs %>% filter(Weight_Category == "5 to 10 tons") %>% pull(Loading_Cost)
-  } else {
-    loading_costs %>% filter(Weight_Category == "> 10 tons") %>% pull(Loading_Cost)
-  }
-}
+library(data.table)
+# Reshape the data frame to a wide format
+mean_cost_matrix <- dcast(mean_loading_cost,
+                          Warehouse ~ DC, 
+                          value.var = "mean")
 
-# Calculate loading costs based on total weights for each distribution center
-loading_costs_per_dc <- sapply(total_weight, 
-                               get_loading_cost)
+# Convert the data frame to a matrix and remove the Warehouse column
+loading_costs_per_dc <- as.matrix(mean_cost_matrix[,-1])
+
+# Set row names as the warehouse names
+rownames(loading_costs_per_dc) <- mean_loading_cost$Warehouse[!duplicated(mean_loading_cost$Warehouse)]
 ```
 
 ```{r}
 #| warning: false
 #| message: false
 #| echo: false
-#| layout: [[50,50]]
+#| layout: [[40,60]]
 #| fig-caption: "Each cell's color intensity corresponds to the magnitude of the data point it represents, making it easy to identify patterns, trends, and correlations at a glance."
 library(ggplot2)
 library(reshape2)
 
 # Convert the distance matrix to a data frame
-distance_df <- melt(distance_matrix)
-colnames(distance_df) <- c("Warehouse", "Distribution_Center", "Distance (km)")
+distance_df <- melt(transportation_costs)
+colnames(distance_df) <- c("Warehouse", "Distribution_Center", "Transportation Cost (VNĐ)")
 
 # Plot the distance matrix with updated colors
-ggplot(distance_df, aes(x = Warehouse, y = Distribution_Center, fill = `Distance (km)`)) +
+ggplot(distance_df, aes(x = Warehouse, y = Distribution_Center, fill = `Transportation Cost (VNĐ)`)) +
   geom_tile() +
-  geom_text(aes(label = round(`Distance (km)`, 1)), color = "black") +  # Add numbers
+  geom_text(aes(label = round(`Transportation Cost (VNĐ)`, 1)), color = "black") +  # Add numbers
   scale_fill_gradient(high = "#ff7f0e", low = "white") +  # Custom colors
   theme_minimal() +
   labs(title = "Transportation Costs Heatmap",
@@ -262,21 +275,53 @@ ggplot(distance_df, aes(x = Warehouse, y = Distribution_Center, fill = `Distance
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Convert the transportation costs matrix to a data frame
-costs_df <- melt(loading_costs_per_dc )
-colnames(costs_df) <- c("Warehouse", "Distribution_Center", "Transportation Cost")
-
-# Plot the transportation costs matrix with updated colors
-ggplot(costs_df, aes(x = Warehouse, y = Distribution_Center, fill = `Transportation Cost`)) +
-  geom_tile() +
-  geom_text(aes(label = round(`Transportation Cost`, 1)), color = "black") +  # Add numbers
-  scale_fill_gradient(high = "#1f77b4", low = "white") +  # Custom colors
-  theme_minimal() +
-  labs(title = "Loading Costs Heatmap",
-       x = "Warehouse",
-       y = "") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-
+library(gt)
+library(gtExtras)
+# Create a gt table
+m<-loading_costs %>%
+  mutate(Loading_Cost = Loading_Cost * 1000,
+         DC = paste("DC",DC),
+         Warehouse = paste("WH",Warehouse)) # Convert to currency
+  
+head(m[order(-m$Loading_Cost),]) %>% 
+  gt() %>%
+  fmt_currency(
+    columns = Loading_Cost,
+    currency = "VND",
+    decimals = 0,
+    use_seps = TRUE
+  ) %>%
+  tab_header(
+    title = md("**Loading Costs by weight category in each warehouses**"),
+    subtitle = md("Table just contains **expected loading cost**")
+  ) %>%  
+  opt_align_table_header(align = "center") %>% 
+  cols_label(
+    Loading_Cost = "Loading Cost (VNĐ)",
+    Weight_Category = "Weight Category",
+    Has_Machine = "Has Machine",
+    DC = "Distribution Center"
+  ) %>% 
+  data_color(method = "numeric",
+             palette = "viridis",
+             reverse = TRUE) %>% 
+  gt_theme_pff() %>% 
+  tab_style(style = list(cell_text(align = "center")),
+            locations = cells_body(columns = everything())) %>%
+  tab_style(
+    style = list(
+      cell_text(align = "center")
+    ),
+    locations = list(
+      cells_column_labels(everything())
+    )
+  ) %>% 
+  tab_source_note(source = md("*Source: package gt in R*")) %>% 
+  tab_style(
+    style = "font-weight: bold",
+    locations = cells_body(Weight_Category)
+  )
+  
 ```
 
 Sau khi đã có đủ dữ liệu, bạn sẽ bắt đầu viết hàm mục tiêu và dùng thuật toán GA để tìm ra giá trị tối ưu nhất.
@@ -321,9 +366,6 @@ Hàm `ga()` phải có ít nhất 2 đối số là `type` và `fitness thì R m
 library(GA)
 demand<-c(distribution_centers$Demand)
 
-cost_matrix = transportation_costs + loading_costs_per_dc
-# Define the transportation cost matrix
-
 # Define the objective function
 objective_function <- function(quantities) {
     quantities_matrix <- matrix(quantities, 
@@ -331,7 +373,13 @@ objective_function <- function(quantities) {
                                 ncol = 3, 
                                 byrow = TRUE)
     
-    total_cost <- sum(quantities_matrix * cost_matrix)
+    # Calculate total loading costs
+    loading_costs <- rowSums(quantities_matrix) * loading_costs_per_dc  # Total loading costs for each DC
+    # Calculate total transportation costs
+    transportation_costs <- sum(quantities_matrix * transportation_costs)
+    
+    # Combine both costs
+    total_cost <- sum(loading_costs) + transportation_costs
     
     # Check if demands are met
     if (any(colSums(quantities_matrix) < demand)) {
@@ -345,7 +393,7 @@ objective_function <- function(quantities) {
 num_vars <- 5 * 3  # 5 warehouses, 3 distribution centers
 ga_result <- ga(
     type = "real-valued",
-    fitness = function(x) -objective_function(x),  # Negate for maximization
+    fitness = function(x) -objective_function(x),  # Negate for minimization
     lower = rep(0, num_vars),  # Minimum quantity
     upper = rep(100, num_vars),  # Maximum quantity (adjust as needed)
     popSize = 50,
@@ -366,12 +414,10 @@ Và cuối cùng, sau khi có kết quả, mình sẽ dùng các thư viện g�
 Nhìn chung, những công cụ này cung cấp các lựa chọn mạnh mẽ để trình bày dữ liệu một cách hấp dẫn và thông tin. Bạn có thể lựa chọn 1 trong 3 chúng, vì lý do học nên mình trình bày cả 3 luôn!.
 
 ```{r}
+#| echo: false
 #| warning: false
 #| message: false
-#| layout: [[100],[40,60]]
-
 library(leaflet)
-
 # Create custom icons
 warehouse_icon <- makeIcon(
       iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/warehouse_icon.png",  # Update with your actual file path
@@ -384,8 +430,21 @@ dc_icon <- makeIcon(
       iconWidth = 30, 
       iconHeight = 30
     )
-    
-    # Assuming ga_result@solution contains optimal quantities
+
+
+## Update flag of countries in each locations:
+library(readxl)
+write <- read_excel("write.xlsx")
+warehouses<-write[1:5,]
+distribution_centers<-write[6:8,]
+```
+
+
+```{r}
+#| warning: false
+#| message: false
+#| layout: [[100],[40,60]]
+# Assuming ga_result@solution contains optimal quantities
 ga_result_solution <- c(ga_result@solution)
 
 # Reshape the solution into a matrix (5 warehouses x 3 DCs)
@@ -394,123 +453,336 @@ optimal_quantities <- matrix(ga_result@solution,
                              ncol = 3, 
                              byrow = TRUE)
 
-    # Create the leaflet map
-map <- leaflet() %>% 
+# Convert the matrix to a data frame
+weights<-optimal_quantities* weights_per_good
+
+rownames(weights) <- 1:5
+colnames(weights) <- 1:3
+
+library(reshape2)
+real_weighted <- melt(weights)
+
+# Rename the columns
+colnames(real_weighted) <- c("Warehouse", "DC", "Total_Weight")
+
+# Perform left join
+result <- real_weighted %>%
+  left_join(loading_costs, by = c("Warehouse", "DC"))
+
+result <-result %>% 
+  mutate(Price = case_when(
+    Total_Weight < 1.5 ~ "< 1.5",
+    Total_Weight <2.5 ~ "1.5 to 2.5",
+    Total_Weight < 5 ~ "2.5 to 5",
+    Total_Weight < 10 ~ "5 to 10",
+    Total_Weight >= 10 ~ "> 10",
+      is.na(Total_Weight) ~ NA_character_  # Handle NA explicitly if needed
+  ))
+  
+result<-result %>% 
+  filter(Weight_Category == Price) %>% 
+  select(-Price)
+
+# Join with tranportation cost table:
+rownames(transportation_costs) <- 1:5
+colnames(transportation_costs) <- 1:3
+
+transport<-melt(transportation_costs)
+
+# Rename the columns
+colnames(transport) <- c("Warehouse", "DC", "Transport_cost")
+
+
+result<-left_join(result,
+                  transport,
+                  by=c("Warehouse", "DC"))
+
+# Adjust:
+
+result<-result %>% 
+      mutate(Loading_Cost = Loading_Cost*1000,
+             Transport_cost = Transport_cost*1000,
+             DC = paste("DC",DC),
+             Warehouse = paste("WH",Warehouse)) 
+
+# Reorder cols in table:
+result<-result[,c("Warehouse",
+                 "DC",
+                 "Has_Machine",
+                 "Total_Weight",
+                 "Weight_Category",
+                 "Loading_Cost",
+                 "Transport_cost")]
+```
+
+### Báo cáo:
+
+Cuối cùng là hiển thị kết quả đã phân tích được.
+
+Để kết nối các biểu đồ lại với nhau, ta thường nghĩ `Shiny` trong **R** nhưng vì chúng ta đang tạo website bằng **Quarto** nên output cuối cùng sẽ là một trang web tĩnh - *static website*. Do đó, nó sẽ không phản hồi với thông tin đầu vào của người dùng hoặc chạy bất kỳ mã R nào. Bạn có thể hình dung giống như bạn đang muốn xem biểu đồ về doanh thu trong tháng tiếp theo trên 1 biểu đồ trong Word - không thể làm được vì nó thuộc dạng văn bản, bạn chỉ đọc hoặc nhìn chứ không tương tác được.
+
+Tuy vậy, sau một thời gian tìm hiểu, mình cũng tìm được cách để nhúng **Shiny** vào R để hiển thị trên Quarto. Nguồn tài liệu bạn có thể kham khảo ở trang này [r-shinylive-demo](https://github.com/coatless-quarto/r-shinylive-demo).
+
+Tóm tắt cho bạn nào lười đọc thì bạn cần đổi chunk từ `{r}` thành `shinylive-r` và thêm các tham số như dưới đây.
+
+````yml
+```{shinylive-r}
+#| standalone: true
+#| viewHeight: 1000
+```
+````
+
+```{shinylive-r}
+#| viewerHeight: 1000
+#| standalone: true
+
+## Prepare data:
+
+# Convert GA solution to a matrix
+# Optimal quantities matrix
+optimal_quantities <- matrix(c(
+  43.306058, 10.87137, 13.26283,
+  15.524054, 30.42748, 48.86716,
+  7.599769, 44.93531, 27.46289,
+  18.556927, 17.60396, 41.85203,
+  16.305016, 13.15498, 21.79634
+), nrow = 5, ncol = 3, byrow = TRUE)
+
+
+# Warehouse data:
+warehouses <- data.frame(
+  ID = 1:5,
+  Latitude = c(21.0285, 16.0545, 10.7769, 14.0583, 19.8060),
+  Longitude = c(105.8040, 108.2022, 106.6957, 108.2772, 105.7460),
+  District = c("Đống Đa", "Hải Châu", "Quận 1", "Mang Yang", "Đông Sơn"),
+  Province = c("Hà Nội", "Đà Nẵng", "Hồ Chí Minh", "Gia Lai", "Thanh Hóa"),
+  Address = c(
+    "2RH3+9HX Đống Đa, Hà Nội, Việt Nam",
+    "3632+RV4 Hải Châu, Đà Nẵng, Việt Nam",
+    "QMGW+Q74 Quận 1, Hồ Chí Minh, Việt Nam",
+    "375G+8VG Mang Yang, Gia Lai, Việt Nam",
+    "RP4W+99X Đông Sơn, Thanh Hóa, Việt Nam"
+  )
+)
+
+# Distribution center data:
+distribution_centers <- data.frame(
+  ID = 1:3,
+  Latitude = c(17.97486, 11.77690, 15.12233),
+  Longitude = c(102.6309, 106.6957, 108.7994),
+  District = c("Viêng Chăn", "Lộc Ninh", "Quảng Ngãi"),
+  Province = c("Lào", "Bình Phước", "Quảng Ngãi"),
+  Address = c(
+    "XJFJ+W8X Viêng Chăn, Lào",
+    "QMGW+Q74 Lộc Ninh, Bình Phước, Việt Nam",
+    "4QCX+WPQ Quảng Ngãi, Việt Nam"
+  )
+)
+
+# Custom icon:
+warehouse_icon <- makeIcon(
+      iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/warehouse_icon.png",  # Update with your actual file path
+      iconWidth = 30, 
+      iconHeight = 30
+    )
+
+dc_icon <- makeIcon(
+      iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/distribution_center.png",  # Update with your actual file path
+      iconWidth = 30, 
+      iconHeight = 30
+    )
+
+# Load required libraries
+pacman::p_load(leaflet, 
+               dplyr, 
+               networkD3)
+library(shiny)
+library(bslib)
+
+# Define UI
+ui <- fluidPage(
+  titlePanel("Warehouse Distribution Dashboard"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      checkboxGroupInput(inputId = "warehouse", 
+                         label = "Select Warehouse:", 
+                         choices = paste("Warehouse", 1:5), 
+                         selected = paste("Warehouse", 1))
+    ), 
+    mainPanel(
+      tabsetPanel(
+        tabPanel("Map", 
+                 leafletOutput("map", height = "400px")),
+        tabPanel("Data & Sankey",
+                 fluidRow(
+                   column(8, dataTableOutput("cost_table")),
+                   column(4, uiOutput("sankey_ui"))
+                 )
+        )
+      )
+    )
+  )
+)
+
+# Define server logic
+server <- function(input, output, session) {
+  
+  location <- reactive({
+    req(input$warehouse) 
+    as.numeric(sub("Warehouse ", "", input$warehouse))
+  })
+  
+  # Create the leaflet map
+  output$map <- renderLeaflet({
+    req(location())
+    
+    # Initialize the map
+    map <- leaflet() %>%
       addTiles() %>%
-      addMarkers(data = warehouses, 
-                 lat = ~Latitude, lng = ~Longitude, 
-                 popup = ~paste("Warehouse ID:", ID), 
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addMarkers(data = warehouses %>% filter(ID %in% location()), 
+                 lat = ~Latitude, 
+                 lng = ~Longitude, 
+                 label = ~paste0("<strong> ID Warehouse: </strong> ", ID, "<br/> ",
+                                 "<strong> Province: </strong> ", Province, "<br/> ",
+                                 "<strong> District: </strong> ", District, "<br/> ",
+                                 "<strong> Address: </strong> ", Address, "<br/> ") %>% 
+                   lapply(htmltools::HTML),
                  icon = warehouse_icon) %>%
       addMarkers(data = distribution_centers, 
-                 lat = ~Latitude, lng = ~Longitude, 
-                 popup = ~paste("DC ID:", ID, "<br>Demand:", Demand), 
+                 lat = ~Latitude, 
+                 lng = ~Longitude, 
+                 label = ~paste0("<strong> ID Distribution Center: </strong> ", ID, "<br/> ",
+                                 "<strong> Province: </strong> ", Province, "<br/> ",
+                                 "<strong> District: </strong> ", District, "<br/> ",
+                                 "<strong> Address: </strong> ", Address, "<br/> ") %>% 
+                   lapply(htmltools::HTML),
                  icon = dc_icon)
-
+    
+    qty_data <- optimal_quantities[location(), , drop = FALSE]  
+    
     # Add routes based on the optimal quantities
-    for (i in 1:nrow(optimal_quantities)) {
-      for (j in 1:ncol(optimal_quantities)) {
-        if (optimal_quantities[i, j] > 0) {
+    for (i in 1:nrow(qty_data)) {
+      for (j in 1:ncol(qty_data)) {
+        if (qty_data[i, j] > 0) {
           route_start <- warehouses[warehouses$ID == i, c("Longitude", "Latitude")]
           route_end <- distribution_centers[distribution_centers$ID == j, c("Longitude", "Latitude")]
           
-map <- map %>%
+          map <- map %>%
             addPolylines(lat = c(route_start$Latitude, route_end$Latitude),
                          lng = c(route_start$Longitude, route_end$Longitude),
                          color = "black", weight = 2, opacity = 0.5)
         }
       }
     }
+    
+    map  # Return the modified map
+  })
+  
+  # Render the cost table
+  output$cost_table <- renderDataTable({
+    req(location())
+    
+    gt <- result %>% 
+      filter(Warehouse %in% paste("WH", location())) %>% 
+      select(c(Warehouse, DC, Loading_Cost, Transport_cost))
+    
+    gt
+  })
+  
+  # Render the Sankey diagram
+  output$sankey_ui <- renderUI({
+    req(location())
+    
+    qty_data <- optimal_quantities[location(), , drop = FALSE] 
+    req(nrow(qty_data) > 0)  # Ensure there is data to display
+    
+    # Create links data frame
+    links <- data.frame(
+      source = rep(0:(nrow(qty_data) - 1), each = ncol(qty_data)),  
+      target = as.vector(sapply(0:(ncol(qty_data) - 1), 
+                                function(j) rep(nrow(qty_data) + j, nrow(qty_data)))),
+      value = as.vector(qty_data)  
+    )
+    
+    # Filter for selected warehouses
+    links <- links %>% filter(source %in% (location() - 1))  
+    
+    # Create nodes data frame
+    nodes <- data.frame(name = c(paste("Warehouse", location()), paste("DC", 1:ncol(qty_data))))
+    
+    # Create the Sankey network
+    sankey <- sankeyNetwork(Links = links, 
+                            Nodes = nodes, 
+                            Source = "source", 
+                            Target = "target", 
+                            Value = "value",
+                            NodeID = "name",
+                        height = 500,  
+                        width = 400,
+                        fontSize = 12,
+                        nodeWidth = 20,
+                        sinksRight = FALSE) # Change this value to make it thinner
+    
+    # Customize tooltips and add click functionality to show a value panel
+sankey <- htmlwidgets::onRender(sankey, "
+  function(el, x) {
+    // Create a div for the value panel
+    var valuePanel = d3.select('body').append('div')
+      .attr('class', 'value-panel')
+      .style('position', 'absolute')
+      .style('padding', '8px')
+      .style('background', 'lightgray')
+      .style('border', '1px solid gray')
+      .style('border-radius', '4px')
+      .style('opacity', 0);  // Start hidden
 
-map %>%
-  addProviderTiles(providers$CartoDB.Positron) 
+    // Append title for tooltips on hover
+    d3.selectAll('.link')
+      .append('title')
+      .text(function(d) { return d.value; });  // Show value on hover
 
-library(gt)
-library(gtExtras)
+    // Add click event to show the value panel
+    d3.selectAll('.link')
+      .on('click', function(event, d) {
+        // Ensure we get the correct value
+        var value = d3.select(this).datum().value;
 
-    # Convert GA solution to a data frame
-result <- as.data.frame(matrix(ga_result@solution, nrow = 5, byrow = TRUE))
-    colnames(result) <- c("DC1", "DC2", "DC3")
-    rownames(result) <- c("WH1", "WH2", "WH3", "WH4", "WH5")
-result <- cbind(Workload = rownames(result), result)
+        // Position the value panel near the mouse cursor
+        valuePanel
+          .style('left', (event.pageX + 5) + 'px')
+          .style('top', (event.pageY + 5) + 'px')
+          .style('opacity', 1)  // Make it visible
+          .html('Value: ' + value);  // Set the text to the link value
 
-result_long <- result %>% 
-  pivot_longer(cols = starts_with("DC"), names_to = "Distribution_Center", values_to = "Quantity")
-    # Create and display the table
-result_long %>%
-  gt() %>%
-  tab_header(title = "Details Planning Table") %>%
-  cols_label(Distribution_Center = "Distribution Center") %>% 
-  tab_row_group(
-    label = html("<strong><img src='https://upload.wikimedia.org/wikipedia/commons/5/56/Flag_of_Laos.svg' width='20' /> Laos</strong>"),
-    rows = Distribution_Center == "DC1"
-  ) %>% 
-  tab_row_group(
-    label = html("<strong><img src='https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Flag_of_Vietnam.svg/345px-Flag_of_Vietnam.svg.png' width='20' /> Vietnam</strong>"),
-    rows = Distribution_Center %in% c("DC2", "DC3")
-  ) %>% 
-  fmt_number(columns = c(Quantity), decimals = 2) %>%
-  cols_label(Workload = "Warehouse") %>%
-  tab_style(style = list(cell_text(align = "center")),
-            locations = cells_body(columns = everything())) %>%
-  tab_source_note(source = md("*Source: package gt in R*")) %>%
-  gt_theme_excel() %>%
-  summary_rows(
-    groups = everything(),
-    columns = Quantity, 
-    fns = list(Total = ~sum(.),
-               Count = ~n()))%>% 
-  tab_footnote(
-    footnote = md("**Count** means number of shipment."),
-    locations = cells_summary(rows = "Count")
-  ) %>% 
-  tab_footnote(
-    footnote = md("**Total** means the optimal quantity of good."),
-    locations = cells_summary(rows = "Total")
-  ) 
+        // Hide the panel after a delay
+        setTimeout(function() {
+          valuePanel.style('opacity', 0);
+        }, 2000);  // Change the delay as needed
+      });
+  }
+")
+    
+    ## Add title and caption:
+sankey <- htmlwidgets::appendContent(sankey, htmltools::tags$p(style = "font-size: 12px; text-align: right;", " A wider arrow indicates that a larger quantity is being sent from that warehouse to a distribution center."))
+    sankey  # Output the Sankey diagram
+  })
+}
 
-library(networkD3)
-library(jsonlite)
-
-# Define colors for nodes
-colors <- c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
-
-# Define example data
-Warehouses <- c("Warehouse 1", "Warehouse 2", "Warehouse 3", "Warehouse 4", "Warehouse 5")
-Distribution_centers <- c("DC 1", "DC 2", "DC 3")
-
-# Create nodes data frame
-nodes <- data.frame(name = c(Warehouses, Distribution_centers))
-
-# Assign colors based on node index
-node_colors <- c(rep(1:length(Warehouses), each = 1), rep(length(Warehouses) + 1:length(Distribution_centers), each = 1))
-
-# Create links data frame
-links <- data.frame(
-  source = rep(0:(nrow(optimal_quantities) - 1), each = ncol(optimal_quantities)),  
-  target = as.vector(sapply(0:(ncol(optimal_quantities) - 1), 
-                             function(j) rep(nrow(optimal_quantities) + j, nrow(optimal_quantities)))),  
-  value = as.vector(optimal_quantities)  
-)
-
-# Create a Sankey diagram with node colors
-sankey <- sankeyNetwork(Links = links, 
-                        Nodes = nodes, 
-                        Source = "source", 
-                        Target = "target", 
-                        Value = "value",
-                        NodeID = "name",
-                        colourScale = JS(paste0("d3.scaleOrdinal().domain([0,", length(colors) - 1, "]).range(", toJSON(colors), ");")),
-                        height = 900,  # Adjust height to reduce vertical space
-                        width = 1000)   # Adjust width to fit more nodes in one line
-
-
-## Add title and caption:
-sankey <- htmlwidgets::prependContent(sankey, htmltools::tags$h1("Sankey chart"))
-sankey <- htmlwidgets::appendContent(sankey, htmltools::tags$p(style = "font-size: 14px; text-align: center;", " A wider arrow indicates that a larger quantity is being sent from that warehouse to a distribution center."))
-
-# Display the Sankey diagram
-sankey
+# Run the application 
+shinyApp(ui = ui, server = server)
 ```
+
+Bạn có thể thấy với **dashboard** như vậy, ta có thể xem được nhiều thông tin hơn như:
+
+- Vị trí cụ thể của từng *WH* và *DC* cũng như là các tuyến đường dự kiến bằng các đường thẳng minh họa. (Xem **Map tab**)
+
+- Thông tin về chi phí *Loading cost* và *Transporation cost* cũng như lượng hàng cần vận chuyển cho từng nhà kho. (Xem **Table and Sankey tab**)
+
+Bạn có thể xem cho 1 hoặc nhiều nhà kho bằng cách *click* trên thanh **Filter**. Ngoài ra, đặc biệt với **Sankey chart**, bạn cần giữ hoặc *click* chuột vào tuyến để xem được số lượng hàng.
+
+Tuy rất thích R nhưng mình vẫn không thích xây dựng dashboard bằng R lắm vì quá nặng về code và không hiệu quả về thời gian, nguồn lực. Các tools khác mình ưu tiên hơn như **Power BI**, **Tableau** hoặc các **BIs** mà công ty bạn sử dụng trong công việc hằng ngày.
 
 ## Mô hình MILP:
 
@@ -609,34 +881,18 @@ model5 <- MIPModel() %>%
 
 ```{r}
 #| layout-nrow: 2
-## Barchart:
+#| warning: false
+#| message: false
+#| echo: false
+
+
+## Table:
 solution <- get_solution(model5, x[i, j]) %>% 
      filter(value > 0)
 
-library(ggplot2)
-library(dplyr)
-
-# Assuming `solution` contains the results of x[i, j]
-# Transform the solution into a tidy format for plotting
-plot_data <- solution %>%
-  rename(Manufacter= i, DC = j, Flow = value) %>%
-  mutate(Manufacter = paste("Manufacter", Manufacter),
-         DC = paste("DC", DC))
-
-# Create a plot
-ggplot(plot_data, aes(x = Manufacter, y = Flow, fill = DC)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  theme_minimal() +
-  labs(title = "Transshipment Flow from Manufacters to Distribution Centers",
-       x = "Manufacters",
-       y = "Flow Amount",
-       fill = "Distribution Centers") +
-  theme(text = element_text(size = 12),
-        axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_fill_brewer(palette = "Set2")
-
-
 library(gt)
+library(dplyr)
+library(scales)  
 
 # Assuming `solution` contains the results of x[i, j]
 # Transform the solution into a tidy format for the table
@@ -650,57 +906,124 @@ table_data <- solution %>%
 table_data %>%
   gt() %>%
   tab_header(
-    title = md("**Transshipment Flows from Manufacturers to Distribution Centers**")
+    title = md("**Transshipment flows from Manufacturers to Distribution Centers**")
   ) %>%
   cols_label(
-    Manufacturer = "Manufacturer",
-    DC = "Distribution Center",
-    Flow = "Flow Amount"
-  ) %>%
+    Manufacturer = md("**Manufacturer**"),
+    DC = md("**Distribution Center**"),
+    Flow = md("**Flow Amount**")) %>%
   fmt_number(
     columns = c(Flow),
     decimals = 2
   ) %>%
-  tab_style(
-    style = list(
-      cell_fill(color = "lightblue")
-    ),
-    locations = cells_body(
-      columns = c(Flow),
-      rows = Flow > 0
-    )
+  data_color(
+    columns = c(Flow),  # Use c() instead of vars()
+    colors = scales::col_numeric(palette = c("#2ca02c","#ff7f0e"), domain = NULL)
+  ) %>%
+  cols_align(
+    align = "center",
+    columns = everything()  # Applies to all columns
   ) %>%
   tab_options(
     table.width = pct(100)
   ) %>% 
-  gt_theme_excel()
+  gt_theme_espn()
+
+## Barchart:
+
+library(ggplot2)
+plot_data <- solution %>%
+  rename(Manufacter= i, DC = j, Flow = value) %>%
+  mutate(Manufacter = paste("Manufacter", Manufacter),
+         DC = paste("DC", DC))
+
+# Create a plot
+ggplot(plot_data, aes(x = Manufacter, y = Flow, fill = DC)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "",
+       x = "Manufacters",
+       y = "Flow Amount",
+       fill = "Distribution Centers") +
+  theme(text = element_text(size = 12),
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_brewer(palette = "Set2")
 ```
 
-<div>
-  <hr>
 
-  <h3> Share </h3>
-  <a href="https://github.com/Loccx78vn/" target="_blank" class="github-button">Visit my GitHub</a>
+Như vậy, chúng ta đã được biết sơ lược về thuật toán Genetic và mô hình MILP cũng như cách thực hiện trong Rstudio. 
 
-  <hr>
-</div>
+Nếu bạn có câu hỏi hay thắc mắc nào, đừng ngần ngại liên hệ với mình qua Gmail. Bên cạnh đó, nếu bạn muốn xem lại các bài viết trước đây của mình, hãy nhấn vào hai nút dưới đây để truy cập trang **Rpubs** hoặc mã nguồn trên **Github**. Rất vui được đồng hành cùng bạn, hẹn gặp lại! 😄😄😄
 
-<style>
-.github-button {
-  display: inline-block;
-  padding: 10px 20px;
-  font-size: 16px;
-  color: white;
-  background-color: #007bff; /* Bootstrap primary color */
-  border: none;
-  border-radius: 5px;
-  text-decoration: none;
-  text-align: center;
-  transition: background-color 0.3s;
-}
 
-.github-button:hover {
-  background-color: #0056b3; /* Darker shade on hover */
-}
-</style>
+```{=html}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Me</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simple-icons@v6.0.0/svgs/rstudio.svg">
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f9f9f9; }
+        .container { max-width: 400px; margin: auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+        label { display: block; margin: 10px 0 5px; }
+        input[type="email"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; }
+        .github-button, .rpubs-button { margin-top: 20px; text-align: center; }
+        .github-button button, .rpubs-button button { background-color: #333; color: white; border: none; padding: 10px; cursor: pointer; border-radius: 4px; width: 100%; }
+        .github-button button:hover, .rpubs-button button:hover { background-color: #555; }
+        .rpubs-button button { background-color: #75AADB; }
+        .rpubs-button button:hover { background-color: #5A9BC2; }
+        .rpubs-icon { margin-right: 5px; width: 20px; vertical-align: middle; filter: brightness(0) invert(1); }
+        .error-message { color: red; font-size: 0.9em; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Contact Me</h2>
+        <form id="emailForm">
+            <label for="email">Your Email:</label>
+            <input type="email" id="email" name="email" required aria-label="Email Address">
+            <div class="error-message" id="error-message" style="display: none;">Please enter a valid email address.</div>
+            <button type="submit">Send Email</button>
+        </form>
+        <div class="github-button">
+            <button>
+                <a href="https://github.com/Loccx78vn" target="_blank" style="color: white; text-decoration: none;">
+                    <i class="fab fa-github"></i> View Code on GitHub
+                </a>
+            </button>
+        </div>
+        <div class="rpubs-button">
+            <button>
+                <a href="https://rpubs.com/loccx" target="_blank" style="color: white; text-decoration: none;">
+                    <img src="https://cdn.jsdelivr.net/npm/simple-icons@v6.0.0/icons/rstudio.svg" alt="RStudio icon" class="rpubs-icon"> Visit my RPubs
+                </a>
+            </button>
+        </div>
+    </div>
 
+    <script>
+        document.getElementById('emailForm').addEventListener('submit', function(event) {
+            event.preventDefault(); // Prevent default form submission
+            const emailInput = document.getElementById('email');
+            const email = emailInput.value;
+            const errorMessage = document.getElementById('error-message');
+
+            // Simple email validation regex
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (emailPattern.test(email)) {
+                errorMessage.style.display = 'none'; // Hide error message
+                const yourEmail = 'loccaoxuan103@gmail.com'; // Your email
+                const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${yourEmail}&su=Help%20Request%20from%20${encodeURIComponent(email)}`;
+                window.open(gmailLink, '_blank'); // Open in new tab
+            } else {
+                errorMessage.style.display = 'block'; // Show error message
+            }
+        });
+    </script>
+</body>
+</html>
+```
