@@ -22,8 +22,5 @@ format:
   html:
     theme: 
       light: flatly
-      dark: darkly
     toc: true
-    
-filters:
-  - shinylive
+  

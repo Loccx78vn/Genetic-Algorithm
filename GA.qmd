@@ -8,6 +8,8 @@ format:
   html:
     code-fold: true
     code-tools: true
+filters:
+- shinylive
 bibliography: references.bib
 ---
 
@@ -109,7 +111,10 @@ Hàm chi phí tổng thể được xác định như sau:
 $$
 TC = \sum_{i=1}^{m} \left( D_{ij} \times \frac{P}{F} \times 0.4 + LC_i \right) \times Q_j
 $$
-Vì vậy, nếu trong công việc, chúng ta sẽ cần lấy dữ liệu từ **Data warehouse** bằng SQL hoặc các phần mềm **Business Intelligence** khác. Ở đây, nhằm minh họa, mình đã tạo ra code ở phía dưới để các bạn luyện tập.
+
+Trong bài toán này, bạn sẽ cần dữ liệu để tính toán 2 thông số là: **Phí bốc xếp (Loading cost)** và **Chi phí vận chuyển (Transportation cost)**.
+
+Nếu trong công việc thường ngày ở công ty, chúng ta sẽ cần lấy dữ liệu từ **Data warehouse** bằng SQL hoặc các phần mềm **Business Intelligence** khác. Ở đây, nhằm mục đích học tập, mình đã tạo ra code ở phía dưới để xây dựng dữ liệu cho các bạn luyện tập.
 
 ```{r}
 # Create a data frame for loading costs
@@ -155,11 +160,23 @@ distribution_centers <- data.frame(
 )
 ```
 
-Nếu bạn gặp khó khăn trong việc phải đối mặt với cả đống dữ liệu từ hệ thống và chưa biết lấy dữ liệu nào để phân tích hoặc gộp bảng nào qua bảng nào thì lời khuyên của tôi là hãy vẽ bảng **Entity relation diagram (ERD)**. Các bạn có thể dễ dàng hình dung các mối quan hệ thông qua bảng **Entity relation diagram (ERD)** dưới đây:
+Nếu bạn từng gặp khó khăn trong việc phải đối mặt với cả đống dữ liệu từ hệ thống và chưa biết lấy dữ liệu nào để phân tích hoặc gộp bảng nào qua bảng nào thì lời khuyên của mình là hãy vẽ bảng **Entity relation diagram (ERD)**.
+
+**ERD** là một công cụ trực quan dùng để mô tả cấu trúc dữ liệu trong cơ sở dữ liệu. ERD thể hiện các thực thể (*entities*), thuộc tính (*attributes*), và các mối quan hệ (*relationships*) giữa chúng. Các thực thể thường được biểu diễn dưới dạng hình chữ nhật, thuộc tính dưới dạng hình ellips, và mối quan hệ bằng hình thoi hoặc đường nối. ERD giúp lập kế hoạch cho thiết kế cơ sở dữ liệu, đảm bảo rằng các yếu tố dữ liệu và quan hệ giữa chúng được xác định rõ ràng, tạo nền tảng cho việc phát triển và quản lý dữ liệu hiệu quả.
+
+Như biểu đồ dưới đây, mình đang có 3 bảng gồm:
+
+- Bảng thông tin chi tiết về DC.
+
+- Bảng thông tin chi tiết về WH.
+
+- Bảng giá về loading cost và transportation cost từ WH đến DC.
+
+Và các bạn có thể dễ dàng hình dung các mối quan hệ thông qua bảng **Entity relation diagram (ERD)** dưới đây:
 
 ```{r}
 #| echo: false
-#| fig-cap: "Biểu đồ 1: EDR model"
+#| fig-subcap: "Biểu đồ 1: EDR model"
 library(datamodelr)
 # Create the data model from your data frames
 dm1 <- dm_from_data_frames(list(
@@ -180,15 +197,16 @@ dm_create_graph(dm1, rankdir = "LR", columnArrows = TRUE) %>%
   dm_render_graph()
 ```
 
-**ERD** là một công cụ trực quan dùng để mô tả cấu trúc dữ liệu trong cơ sở dữ liệu. ERD thể hiện các thực thể (*entities*), thuộc tính (*attributes*), và các mối quan hệ (*relationships*) giữa chúng. Các thực thể thường được biểu diễn dưới dạng hình chữ nhật, thuộc tính dưới dạng hình ellips, và mối quan hệ bằng hình thoi hoặc đường nối. ERD giúp lập kế hoạch cho thiết kế cơ sở dữ liệu, đảm bảo rằng các yếu tố dữ liệu và quan hệ giữa chúng được xác định rõ ràng, tạo nền tảng cho việc phát triển và quản lý dữ liệu hiệu quả.
 
 ::: callout-tip
 ### Tải package datamodelr:
 
-Mình tạo biểu đồ này bằng thư viện datamodelr. Bạn có thể tải bằng cú pháp: `devtools::install_github("bergant/datamodelr")`
+Mình tạo biểu đồ này bằng thư viện `datamodelr`. Bạn có thể tải bằng cú pháp: `devtools::install_github("bergant/datamodelr")`
 :::
 
-Như vậy, dựa vào đó, ta sẽ tính toán được 2 bảng quan trọng:
+### Dữ liệu đầu vào:
+
+Như vậy, dựa vào đó, ta sẽ tính toán được 2 *matrix* về chi phí:
 
 -   Bảng giá loading ở các kho. (Hình bên trái)
 
@@ -197,7 +215,6 @@ Như vậy, dựa vào đó, ta sẽ tính toán được 2 bảng quan trọng:
 ```{r}
 #| warning: false
 #| message: false
-#| fig-cap: "Biểu đồ 2: Heatmap cho bảng chi phí vận chuyển và bốc xếp "
 ## Calculate the transportation cost:
 # Haversine distance function
 haversine <- function(lat1, lon1, lat2, lon2) {
@@ -254,8 +271,8 @@ rownames(loading_costs_per_dc) <- mean_loading_cost$Warehouse[!duplicated(mean_l
 #| warning: false
 #| message: false
 #| echo: false
-#| layout: [[40,60]]
-#| fig-caption: "Each cell's color intensity corresponds to the magnitude of the data point it represents, making it easy to identify patterns, trends, and correlations at a glance."
+#| layout-nrow: 2
+#| fig-cap: "Biểu đồ 2: Heatmap cho bảng chi phí bốc xếp và bảng giá vận chuyển từ WH đến DC"
 library(ggplot2)
 library(reshape2)
 
@@ -264,7 +281,7 @@ distance_df <- melt(transportation_costs)
 colnames(distance_df) <- c("Warehouse", "Distribution_Center", "Transportation Cost (VNĐ)")
 
 # Plot the distance matrix with updated colors
-ggplot(distance_df, aes(x = Warehouse, y = Distribution_Center, fill = `Transportation Cost (VNĐ)`)) +
+ggplot(distance_df, aes(x = Distribution_Center,y = Warehouse, fill = `Transportation Cost (VNĐ)`)) +
   geom_tile() +
   geom_text(aes(label = round(`Transportation Cost (VNĐ)`, 1)), color = "black") +  # Add numbers
   scale_fill_gradient(high = "#ff7f0e", low = "white") +  # Custom colors
@@ -323,6 +340,8 @@ head(m[order(-m$Loading_Cost),]) %>%
   )
   
 ```
+
+### Xây dựng hàm mục tiêu:
 
 Sau khi đã có đủ dữ liệu, bạn sẽ bắt đầu viết hàm mục tiêu và dùng thuật toán GA để tìm ra giá trị tối ưu nhất.
 
@@ -403,35 +422,11 @@ ga_result <- ga(
 )
 ```
 
-Và cuối cùng, sau khi có kết quả, mình sẽ dùng các thư viện gồm: **Leaflet**, **gt**, và **biểu đồ Sankey** phục vụ những mục đích khác nhau cho trực quan hóa dữ liệu.
-
-1.  **Leaflet**: Đây là một thư viện mạnh mẽ để tạo bản đồ tương tác. Nó cho phép người dùng dễ dàng thêm các lớp, điểm đánh dấu và pop-up, rất lý tưởng để trực quan hóa dữ liệu địa lý. Leaflet đặc biệt hữu ích để hiển thị các dữ liệu như vị trí, lộ trình, hoặc phân bố không gian.
-
-2.  **gt**: Gói **gt** được thiết kế để tạo ra các bảng chất lượng cao trong R. Nó cho phép người dùng định dạng và tạo kiểu cho bảng một cách dễ dàng, giúp chúng trở nên hấp dẫn và dễ đọc. gt hỗ trợ các tính năng như định dạng tùy chỉnh, dòng tóm tắt, và thậm chí thêm chú thích, nâng cao cách trình bày dữ liệu trong báo cáo.
-
-3.  **Biểu đồ Sankey**: Những biểu đồ này được sử dụng để trực quan hóa luồng và mối quan hệ giữa các danh mục khác nhau. Trong R, gói **networkD3** hoặc **ggalluvial** có thể tạo ra biểu đồ Sankey, giúp hiểu cách các giá trị di chuyển giữa các nút, chẳng hạn như theo dõi hành trình người dùng hoặc hiển thị phân bổ tài nguyên.
-
-Nhìn chung, những công cụ này cung cấp các lựa chọn mạnh mẽ để trình bày dữ liệu một cách hấp dẫn và thông tin. Bạn có thể lựa chọn 1 trong 3 chúng, vì lý do học nên mình trình bày cả 3 luôn!.
-
 ```{r}
 #| echo: false
 #| warning: false
 #| message: false
 library(leaflet)
-# Create custom icons
-warehouse_icon <- makeIcon(
-      iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/warehouse_icon.png",  # Update with your actual file path
-      iconWidth = 30, 
-      iconHeight = 30
-    )
-
-dc_icon <- makeIcon(
-      iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/distribution_center.png",  # Update with your actual file path
-      iconWidth = 30, 
-      iconHeight = 30
-    )
-
-
 ## Update flag of countries in each locations:
 library(readxl)
 write <- read_excel("write.xlsx")
@@ -443,7 +438,6 @@ distribution_centers<-write[6:8,]
 ```{r}
 #| warning: false
 #| message: false
-#| layout: [[100],[40,60]]
 # Assuming ga_result@solution contains optimal quantities
 ga_result_solution <- c(ga_result@solution)
 
@@ -517,27 +511,29 @@ result<-result[,c("Warehouse",
 
 ### Báo cáo:
 
-Cuối cùng là hiển thị kết quả đã phân tích được.
+Và cuối cùng, sau khi có kết quả, mình sẽ dùng các thư viện gồm: **Leaflet**, **gt**, và **biểu đồ Sankey** phục vụ những mục đích khác nhau cho trực quan hóa dữ liệu.
 
-Để kết nối các biểu đồ lại với nhau, ta thường nghĩ `Shiny` trong **R** nhưng vì chúng ta đang tạo website bằng **Quarto** nên output cuối cùng sẽ là một trang web tĩnh - *static website*. Do đó, nó sẽ không phản hồi với thông tin đầu vào của người dùng hoặc chạy bất kỳ mã R nào. Bạn có thể hình dung giống như bạn đang muốn xem biểu đồ về doanh thu trong tháng tiếp theo trên 1 biểu đồ trong Word - không thể làm được vì nó thuộc dạng văn bản, bạn chỉ đọc hoặc nhìn chứ không tương tác được.
+1.  **Leaflet**: Đây là một thư viện mạnh mẽ để tạo bản đồ tương tác. Nó cho phép người dùng dễ dàng thêm các lớp, điểm đánh dấu và pop-up, rất lý tưởng để trực quan hóa dữ liệu địa lý. Leaflet đặc biệt hữu ích để hiển thị các dữ liệu như vị trí, lộ trình, hoặc phân bố không gian.
+
+2.  **gt**: Gói **gt** được thiết kế để tạo ra các bảng chất lượng cao trong R. Nó cho phép người dùng định dạng và tạo kiểu cho bảng một cách dễ dàng, giúp chúng trở nên hấp dẫn và dễ đọc. gt hỗ trợ các tính năng như định dạng tùy chỉnh, dòng tóm tắt, và thậm chí thêm chú thích, nâng cao cách trình bày dữ liệu trong báo cáo.
+
+3.  **Biểu đồ Sankey**: Những biểu đồ này được sử dụng để trực quan hóa luồng và mối quan hệ giữa các danh mục khác nhau. Trong R, gói **networkD3** hoặc **ggalluvial** có thể tạo ra biểu đồ Sankey, giúp hiểu cách các giá trị di chuyển giữa các nút, chẳng hạn như theo dõi hành trình người dùng hoặc hiển thị phân bổ tài nguyên.
+
+Để kết nối các biểu đồ lại với nhau, ta thường nghĩ đến `Shiny` trong **R** nhưng vì chúng ta đang tạo website bằng **Quarto** nên output cuối cùng sẽ là một trang web tĩnh - *static website*. Do đó, nó sẽ không phản hồi với thông tin đầu vào của người dùng hoặc chạy bất kỳ mã R nào. Bạn có thể hình dung giống như bạn đang muốn xem biểu đồ về doanh thu trong tháng tiếp theo trên 1 biểu đồ trong Word - không thể làm được vì nó thuộc dạng văn bản, bạn chỉ đọc hoặc nhìn chứ không tương tác được.
 
 Tuy vậy, sau một thời gian tìm hiểu, mình cũng tìm được cách để nhúng **Shiny** vào R để hiển thị trên Quarto. Nguồn tài liệu bạn có thể kham khảo ở trang này [r-shinylive-demo](https://github.com/coatless-quarto/r-shinylive-demo).
 
-Tóm tắt cho bạn nào lười đọc thì bạn cần đổi chunk từ `{r}` thành `shinylive-r` và thêm các tham số như dưới đây.
-
-````yml
 ```{shinylive-r}
+#| viewerHeight: 500
 #| standalone: true
-#| viewHeight: 1000
-```
-````
+#| fig-cap: "Biểu đồ 3: Dashboard về lịch trình vận chuyển hàng dự tính"
+# Load required libraries
+pacman::p_load(leaflet, 
+               dplyr, 
+               networkD3,
+               shiny)
 
-```{shinylive-r}
-#| viewerHeight: 1000
-#| standalone: true
-
-## Prepare data:
-
+# Add value:
 # Convert GA solution to a matrix
 # Optimal quantities matrix
 optimal_quantities <- matrix(c(
@@ -579,25 +575,44 @@ distribution_centers <- data.frame(
   )
 )
 
+# Create a data frame with the warehouse data
+result <- data.frame(
+  Warehouse = c("WH 1", "WH 2", "WH 3", "WH 4", "WH 5",
+                "WH 1", "WH 2", "WH 3", "WH 4", "WH 5",
+                "WH 1", "WH 2", "WH 3", "WH 4", "WH 5"),
+  DC = c("DC 1", "DC 1", "DC 1", "DC 1", "DC 1",
+         "DC 2", "DC 2", "DC 2", "DC 2", "DC 2",
+         "DC 3", "DC 3", "DC 3", "DC 3", "DC 3"),
+  Has_Machine = c("Yes", "No", "No", "No", "No",
+                  "No", "No", "No", "No", "No",
+                  "No", "No", "No", "No", "No"),
+  Total_Weight = c(4.3306058, 1.5524054, 0.7599769, 1.8556927, 1.6305016,
+                   1.0871366, 3.0427479, 4.4935308, 1.7603961, 1.3154977,
+                   1.3262832, 4.8867159, 2.7462887, 4.1852028, 2.1796338),
+  Weight_Category = c("2.5 to 5", "1.5 to 2.5", "< 1.5", "1.5 to 2.5", "1.5 to 2.5",
+                      "< 1.5", "2.5 to 5", "2.5 to 5", "1.5 to 2.5", "< 1.5",
+                      "< 1.5", "2.5 to 5", "2.5 to 5", "2.5 to 5", "1.5 to 2.5"),
+  Loading_Cost = c(64300, 40680, 144640, 38790, 18750,
+                   11610, 97870, 36380, 69120, 70030,
+                   143740, 91150, 64990, 114230, 96240),
+  Transport_cost = c(3802097.2, 5037171.3, 7297102.2, 5952559.7, 3086494.5,
+                     8264855.3, 4021256.9, 889559.4, 2449208.3, 7188382.3,
+                     5831987.6, 974375.3, 4273915.6, 1047828.2, 4905804.6)
+)
+
 # Custom icon:
 warehouse_icon <- makeIcon(
-      iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/warehouse_icon.png",  # Update with your actual file path
+      iconUrl = "https://raw.githubusercontent.com/Loccx78vn/Genetic-Algorithm/refs/heads/main/warehouse_icon.png",  # Update with your actual file path
       iconWidth = 30, 
       iconHeight = 30
     )
 
 dc_icon <- makeIcon(
-      iconUrl = "C:/Users/locca/Documents/Xuân Lộc/R/Project R/Genetic-Algorithm/distribution_center.png",  # Update with your actual file path
+      iconUrl = "https://raw.githubusercontent.com/Loccx78vn/Genetic-Algorithm/refs/heads/main/distribution_center.png",  # Update with your actual file path
       iconWidth = 30, 
       iconHeight = 30
     )
 
-# Load required libraries
-pacman::p_load(leaflet, 
-               dplyr, 
-               networkD3)
-library(shiny)
-library(bslib)
 
 # Define UI
 ui <- fluidPage(
@@ -605,6 +620,7 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
+      helpText("Select one or more warehouses to view distribution data."),
       checkboxGroupInput(inputId = "warehouse", 
                          label = "Select Warehouse:", 
                          choices = paste("Warehouse", 1:5), 
@@ -614,16 +630,19 @@ ui <- fluidPage(
       tabsetPanel(
         tabPanel("Map", 
                  leafletOutput("map", height = "400px")),
-        tabPanel("Data & Sankey",
+        tabPanel("Data Table",
                  fluidRow(
-                   column(8, dataTableOutput("cost_table")),
-                   column(4, uiOutput("sankey_ui"))
-                 )
-        )
+                   column(12, div(style = "height: 400px;", dataTableOutput("cost_table")))
+                 )),
+        tabPanel("Sankey Chart",
+                 fluidRow(
+                   column(12, div(style = "height: 400px;", uiOutput("sankey_ui")))
+                 ))
       )
     )
   )
 )
+
 
 # Define server logic
 server <- function(input, output, session) {
@@ -686,7 +705,10 @@ server <- function(input, output, session) {
     
     gt <- result %>% 
       filter(Warehouse %in% paste("WH", location())) %>% 
-      select(c(Warehouse, DC, Loading_Cost, Transport_cost))
+      select(c(Warehouse, 
+               DC, 
+               Loading_Cost, 
+               Transport_cost))
     
     gt
   })
@@ -786,6 +808,8 @@ Tuy rất thích R nhưng mình vẫn không thích xây dựng dashboard bằng
 
 ## Mô hình MILP:
 
+Tiếp theo ta sẽ chuyển sang thuật toán tuyến tính mới là mô hình MILP.
+
 ### Giới thiệu sơ lược:
 
 **MILP (Mixed Integer Linear Programming)** là một phương pháp tối ưu hóa được sử dụng trong các bài toán lập kế hoạch, phân bổ tài nguyên, và quyết định trong các lĩnh vực như logistics, sản xuất, tài chính, và nhiều lĩnh vực khác. MILP là một phần mở rộng của lập trình tuyến tính (Linear Programming - LP), trong đó có các biến là số nguyên (integer variables) bên cạnh các biến liên tục (continuous variables).
@@ -816,7 +840,8 @@ Trong đó, cấu trúc của một bài toán MILP bao gồm:
     -   Biến nguyên: Chỉ nhận giá trị nguyên (ví dụ: số lượng xe tải).
     -   Biến nhị phân: Chỉ nhận giá trị 0 hoặc 1 (ví dụ: có hoặc không sử dụng một nhà máy).
 
-**Ứng dụng của MILP**
+Mô hình **MILP** là một công cụ mạnh mẽ cho việc tối ưu hóa trong nhiều lĩnh vực khác nhau. Với khả năng kết hợp giữa các biến liên tục và số nguyên, MILP có thể giải quyết nhiều bài toán phức tạp mà các phương pháp tối ưu hóa khác không thể thực hiện hiệu quả.
+Các ứng dụng phổ biến bao gồm:
 
 -   **Quản lý chuỗi cung ứng**: Tối ưu hóa việc phân phối hàng hóa từ các kho đến các khách hàng.
 -   **Lập kế hoạch sản xuất**: Xác định số lượng sản phẩm cần sản xuất để tối đa hóa lợi nhuận hoặc giảm chi phí.
@@ -825,9 +850,7 @@ Trong đó, cấu trúc của một bài toán MILP bao gồm:
 
 Trong R có các thư viện như `lpSolve`, `ompr`, và `ROI` có thể được sử dụng để giải quyết các bài toán MILP.
 
-### Ví dụ:
-
-MILP là một công cụ mạnh mẽ cho việc tối ưu hóa trong nhiều lĩnh vực khác nhau. Với khả năng kết hợp giữa các biến liên tục và số nguyên, MILP có thể giải quyết nhiều bài toán phức tạp mà các phương pháp tối ưu hóa khác không thể thực hiện hiệu quả.
+### Ví dụ về mô hình MILP: 
 
 Gỉa sử ta có bài toán về vấn đề **Transshipment** có yêu cầu là tìm ra phương án vận tải tối ưu nhất để vận chuyển hàng hóa từ nhà máy (**Factory**) thông qua **Crossdocking** và đến được **Distribution Center** với mục tiêu là đạt **chi phí thấp nhất**.
 
@@ -839,6 +862,7 @@ Vì bài toán này thuộc dạng tuyến tính, phương pháp MILP sẽ làm 
 #| warning: false
 #| message: false
 #| output: false
+
 library(ompr)
 library(ompr.roi)
 library(ROI.plugin.glpk)
@@ -880,11 +904,10 @@ model5 <- MIPModel() %>%
 ```
 
 ```{r}
-#| layout-nrow: 2
+#| layout: [[50,50]]
 #| warning: false
 #| message: false
 #| echo: false
-
 
 ## Table:
 solution <- get_solution(model5, x[i, j]) %>% 
@@ -951,7 +974,7 @@ ggplot(plot_data, aes(x = Manufacter, y = Flow, fill = DC)) +
 ```
 
 
-Như vậy, chúng ta đã được biết sơ lược về thuật toán Genetic và mô hình MILP cũng như cách thực hiện trong Rstudio. 
+Như vậy, chúng ta đã được học về thuật toán Genetic và mô hình MILP cũng như cách thực hiện trong Rstudio. 
 
 Nếu bạn có câu hỏi hay thắc mắc nào, đừng ngần ngại liên hệ với mình qua Gmail. Bên cạnh đó, nếu bạn muốn xem lại các bài viết trước đây của mình, hãy nhấn vào hai nút dưới đây để truy cập trang **Rpubs** hoặc mã nguồn trên **Github**. Rất vui được đồng hành cùng bạn, hẹn gặp lại! 😄😄😄
 
