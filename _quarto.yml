@@ -3,9 +3,11 @@ project:
   output-dir: docs
 
 website:
-  title: "Genetic Algorithm"
+  title: "Cao Xuân Lộc"
   navbar:
     left:
+      - href: index.qmd
+        text: Home
       - href: GA.qmd
     tools:
       - icon: github

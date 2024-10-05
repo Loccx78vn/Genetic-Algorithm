@@ -1,3 +1,35 @@
+<style>
+  body {
+    position: relative;
+    overflow: auto; /* Allow scrolling */
+    min-height: 100vh; /* Allows body to grow if content exceeds viewport */
+    margin: 0; /* Remove default margin */
+    color: white; /* Change text color to white */
+  }
+
+  a {
+    color: white; /* Change link color to white */
+    text-decoration: underline; /* Optional */
+  }
+
+  body::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("https://i.pinimg.com/564x/a6/a9/71/a6a9715630d57ab92852b87153acf0cb.jpg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    filter: blur(8px);
+    z-index: -1; /* Keeps the background behind other content */
+  }
+</style>
+
+Nếu bạn có câu hỏi hay thắc mắc nào, đừng ngần ngại liên hệ với mình qua Gmail. Bên cạnh đó, nếu bạn muốn xem lại các bài viết trước đây của mình, hãy nhấn vào hai nút dưới đây để truy cập trang **Rpubs** hoặc mã nguồn trên **Github**. Rất vui được đồng hành cùng bạn, hẹn gặp lại! 😄😄😄
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

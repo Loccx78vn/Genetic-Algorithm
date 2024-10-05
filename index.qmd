@@ -1,0 +1,28 @@
+---
+title: "Cao Xuân Lộc"
+toc: false
+format:
+  html:
+    includes:
+      in_header: header.html
+about:
+  template: solana
+  image: ava.jpg
+  links:
+    - text: "<i class='fas fa-envelope'></i> Email"
+      href: "mailto:loccaoxuan103@gmail.com"
+    - text: "<i class='fab fa-github'></i> GitHub"
+      href: "https://github.com/Loccx78vn/"
+    - text: "<i class='fab fa-r-project'></i> Another projects"
+      href: "https://rpubs.com/loccx"
+---
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+Xin chào, mình là Lộc, sinh năm 2003 và là một chàng trai đến từ mảnh đất đầy nắng và gió - Phú Yên, Việt Nam. Mình có bằng cử nhân trường Đại học Kinh Tế - Tài Chính (UEF) và chuyên ngành của mình là Logistics và quản lý chuỗi cung ứng.
+
+Là người có niềm đam mê mạnh mẽ với R, mình có sở thích viết post về việc phân tích dữ liệu với R để ứng dụng vào các công việc, bài toán thường gặp trong **Supply Chain**. Ngoài ra, sở thích của mình là nghe sách nói và đi bộ!
+
+Câu *slogan* mà mình thích nhất là: **"Don’t fear the risk, fear the opportunity lost!"** và đó cũng là cách mình sống và làm việc 💝💝💝.
+
+Hi vọng các bạn sẽ thích bài viết của mình!
